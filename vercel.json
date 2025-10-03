@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd client && bun install && bun run build",
+  "outputDirectory": "client/dist",
+  "installCommand": "bun install",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3.2.22"
+    }
+  }
+}

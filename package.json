@@ -1,0 +1,14 @@
+{
+  "name": "realms-claim",
+  "version": "1.0.0",
+  "description": "Claims management system with Vercel serverless functions",
+  "type": "module",
+  "scripts": {
+    "dev:server": "cd server && bun start",
+    "dev:client": "cd client && bun dev",
+    "build:client": "cd client && bun build"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.2.22"
+  }
+}
