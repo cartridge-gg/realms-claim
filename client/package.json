@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-key": "bun scripts/generateKey.ts",
+    "setup-campaign": "bun scripts/setupCampaign.ts"
   },
   "dependencies": {
     "@cartridge/connector": "^0.10.7",

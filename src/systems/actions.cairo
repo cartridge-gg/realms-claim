@@ -1,10 +1,20 @@
-use dojo_starter::models::{Direction, Position};
+use dojo_starter::models::{AppPublicKey, LeafData, MerkleRoot, ConsumedClaim, ClaimStatus};
 
 // define the interface
 #[starknet::interface]
 pub trait IActions<T> {
-    fn spawn(ref self: T);
-    fn move(ref self: T, direction: Direction);
+    fn set_app_public_key(ref self: T, public_key: felt252);
+    fn initialize_drop(ref self: T, campaign_id: felt252, merkle_root: felt252);
+    fn claim(
+        ref self: T,
+        campaign_id: felt252,
+        leaf_data: LeafData,
+        merkle_proof: Array<felt252>,
+        signature_r: felt252,
+        signature_s: felt252,
+    );
+    fn is_claimed(self: @T, leaf_hash: felt252) -> bool;
+    fn get_merkle_root(self: @T, campaign_id: felt252) -> felt252;
 }
 
 // dojo decorator
@@ -12,84 +22,135 @@ pub trait IActions<T> {
 pub mod actions {
     use dojo::event::EventStorage;
     use dojo::model::ModelStorage;
-    use dojo_starter::models::{Moves, Vec2};
-    use starknet::{ContractAddress, get_caller_address};
-    use super::{Direction, IActions, Position, next_position};
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+    use super::{IActions, AppPublicKey, LeafData, MerkleRoot, ConsumedClaim, ClaimStatus};
+    use core::ecdsa::check_ecdsa_signature;
+    use core::poseidon::poseidon_hash_span;
+    use core::pedersen::pedersen;
+
+    const APP_ID: felt252 = 'REALMS_CLAIM_APP';
 
     #[derive(Copy, Drop, Serde)]
     #[dojo::event]
-    pub struct Moved {
+    pub struct Claimed {
         #[key]
         pub player: ContractAddress,
-        pub direction: Direction,
+        pub campaign_id: felt252,
+        pub leaf_hash: felt252,
+    }
+
+    #[derive(Copy, Drop, Serde)]
+    #[dojo::event]
+    pub struct AppPublicKeySet {
+        pub public_key: felt252,
+    }
+
+    #[derive(Copy, Drop, Serde)]
+    #[dojo::event]
+    pub struct DropInitialized {
+        pub campaign_id: felt252,
+        pub merkle_root: felt252,
     }
 
     #[abi(embed_v0)]
     impl ActionsImpl of IActions<ContractState> {
-        fn spawn(ref self: ContractState) {
+        fn set_app_public_key(ref self: ContractState, public_key: felt252) {
             // Get the default world.
             let mut world = self.world_default();
 
-            // Get the address of the current caller, possibly the player's address.
-            let player = get_caller_address();
-            // Retrieve the player's current position from the world.
-            let position: Position = world.read_model(player);
+            // Store the app's public key.
+            let app_key = AppPublicKey { app_id: APP_ID, public_key };
+            world.write_model(@app_key);
 
-            // Update the world state with the new data.
-
-            // 1. Move the player's position 10 units in both the x and y direction.
-            let new_position = Position {
-                player, vec: Vec2 { x: position.vec.x + 10, y: position.vec.y + 10 },
-            };
-
-            // Write the new position to the world.
-            world.write_model(@new_position);
-
-            // 2. Set the player's remaining moves to 100.
-            let moves = Moves {
-                player, remaining: 100, last_direction: Option::None, can_move: true,
-            };
-
-            // Write the new moves to the world.
-            world.write_model(@moves);
+            // Emit event for public key registration.
+            world.emit_event(@AppPublicKeySet { public_key });
         }
 
-        // Implementation of the move function for the ContractState struct.
-        fn move(ref self: ContractState, direction: Direction) {
-            // Get the address of the current caller, possibly the player's address.
-
+        fn initialize_drop(ref self: ContractState, campaign_id: felt252, merkle_root: felt252) {
+            // Get the default world.
             let mut world = self.world_default();
 
+            // Store the merkle root for the campaign
+            let root_data = MerkleRoot { campaign_id, root: merkle_root, is_active: true };
+            world.write_model(@root_data);
+
+            // Emit event for drop initialization
+            world.emit_event(@DropInitialized { campaign_id, merkle_root });
+        }
+
+        fn claim(
+            ref self: ContractState,
+            campaign_id: felt252,
+            leaf_data: LeafData,
+            merkle_proof: Array<felt252>,
+            signature_r: felt252,
+            signature_s: felt252,
+        ) {
+            // Get the default world.
+            let mut world = self.world_default();
+
+            // Get the address of the current caller.
             let player = get_caller_address();
 
-            // Retrieve the player's current position and moves data from the world.
-            let position: Position = world.read_model(player);
-            let mut moves: Moves = world.read_model(player);
-            // if player hasn't spawn, read returns model default values. This leads to sub overflow
-            // afterwards.
-            // Plus it's generally considered as a good pratice to fast-return on matching
-            // conditions.
-            if !moves.can_move {
-                return;
-            }
+            // Verify that the caller matches the leaf data address
+            assert(player == leaf_data.address, 'Caller address mismatch');
 
-            // Deduct one from the player's remaining moves.
-            moves.remaining -= 1;
+            // Read the stored merkle root for the campaign
+            let root_data: MerkleRoot = world.read_model(campaign_id);
+            assert(root_data.is_active, 'Campaign not active');
+            assert(root_data.root != 0, 'Campaign not initialized');
 
-            // Update the last direction the player moved in.
-            moves.last_direction = Option::Some(direction);
+            // Hash the leaf data
+            let leaf_hash = InternalImpl::hash_leaf(@self, @leaf_data);
 
-            // Calculate the player's next position based on the provided direction.
-            let next = next_position(position, moves.last_direction);
+            // Check if this leaf has already been claimed
+            let consumed: ConsumedClaim = world.read_model(leaf_hash);
+            assert(!consumed.is_consumed, 'Already claimed');
 
-            // Write the new position to the world.
-            world.write_model(@next);
+            // Verify the merkle proof
+            let is_valid_proof = InternalImpl::verify_merkle_proof(
+                @self, leaf_hash, merkle_proof.span(), root_data.root,
+            );
+            assert(is_valid_proof, 'Invalid merkle proof');
 
-            // Write the new moves to the world.
-            world.write_model(@moves);
+            // Read the stored app public key and verify signature
+            let app_key: AppPublicKey = world.read_model(APP_ID);
+            assert(app_key.public_key != 0, 'App public key not set');
 
-            // Emit an event to the world to notify about the player's move.
-            world.emit_event(@Moved { player, direction });
+            // Create message hash from leaf hash for signature verification
+            let is_valid_sig = check_ecdsa_signature(
+                leaf_hash, app_key.public_key, signature_r, signature_s,
+            );
+            assert(is_valid_sig, 'Invalid signature');
+
+            // Mark the leaf as consumed
+            let timestamp = get_block_timestamp();
+            let consumed_claim = ConsumedClaim {
+                leaf_hash, is_consumed: true, claimer: player, timestamp,
+            };
+            world.write_model(@consumed_claim);
+
+            // Update claim status
+            let mut status: ClaimStatus = world.read_model(player);
+            status.has_claimed = true;
+            status.claim_count += 1;
+            status.last_claim_time = timestamp;
+            world.write_model(@status);
+
+            // Emit the claimed event
+            world.emit_event(@Claimed { player, campaign_id, leaf_hash });
+        }
+
+        fn is_claimed(self: @ContractState, leaf_hash: felt252) -> bool {
+            let world = self.world_default();
+            let consumed: ConsumedClaim = world.read_model(leaf_hash);
+            consumed.is_consumed
+        }
+
+        fn get_merkle_root(self: @ContractState, campaign_id: felt252) -> felt252 {
+            let world = self.world_default();
+            let root_data: MerkleRoot = world.read_model(campaign_id);
+            root_data.root
         }
     }
 
@@ -100,19 +161,63 @@ pub mod actions {
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
             self.world(@"dojo_starter")
         }
-    }
-}
 
-// Define function like this:
-fn next_position(mut position: Position, direction: Option<Direction>) -> Position {
-    match direction {
-        Option::None => { return position; },
-        Option::Some(d) => match d {
-            Direction::Left => { position.vec.x -= 1; },
-            Direction::Right => { position.vec.x += 1; },
-            Direction::Up => { position.vec.y -= 1; },
-            Direction::Down => { position.vec.y += 1; },
-        },
+        /// Hash leaf data using Poseidon hash
+        /// Matches the JavaScript implementation for consistency
+        fn hash_leaf(self: @ContractState, leaf_data: @LeafData) -> felt252 {
+            let mut elements: Array<felt252> = array![];
+
+            // Add address
+            elements.append((*leaf_data.address).into());
+
+            // Add index
+            elements.append((*leaf_data.index).into());
+
+            // Add claim_data length
+            elements.append((*leaf_data.claim_data).len().into());
+
+            // Add claim_data elements
+            let mut i = 0;
+            loop {
+                if i >= (*leaf_data.claim_data).len() {
+                    break;
+                }
+                elements.append(*(*leaf_data.claim_data).at(i));
+                i += 1;
+            };
+
+            // Hash using Poseidon and finalize with Pedersen
+            let poseidon_hash = poseidon_hash_span(elements.span());
+            pedersen(poseidon_hash, 0)
+        }
+
+        /// Verify merkle proof
+        /// Returns true if the proof is valid for the given leaf and root
+        fn verify_merkle_proof(
+            self: @ContractState, leaf: felt252, proof: Span<felt252>, root: felt252,
+        ) -> bool {
+            let mut computed_hash = leaf;
+            let mut i = 0;
+
+            loop {
+                if i >= proof.len() {
+                    break;
+                }
+
+                let proof_element = *proof.at(i);
+
+                // Hash in sorted order
+                computed_hash =
+                    if computed_hash < proof_element {
+                        pedersen(computed_hash, proof_element)
+                    } else {
+                        pedersen(proof_element, computed_hash)
+                    };
+
+                i += 1;
+            };
+
+            computed_hash == root
+        }
     }
-    position
 }
