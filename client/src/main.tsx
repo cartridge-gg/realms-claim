@@ -1,3 +1,4 @@
+import "./index.css";
 import { dojoConfig } from "./dojo/config.ts";
 import { createRoot } from "react-dom/client";
 import { init } from "@dojoengine/sdk";

@@ -1,15 +1,19 @@
 import "./App.css";
 import { StarknetProvider } from "./stores/provider";
-import { EthereumProvider } from "./stores/ethereumProvider";
-import { WalletDashboard } from "./components/WalletDashboard";
+import { ConnectWallet } from "./components/connect-stark";
+import { AppKitProvider } from "./stores/ethProvider";
+import ConnectButton from "./components/connect-eth";
 
 function App() {
   return (
-    <EthereumProvider>
+    <AppKitProvider>
       <StarknetProvider>
-        <WalletDashboard />
+        <div className="flex justify-center items-center h-full gap-16">
+          <ConnectWallet />
+          <ConnectButton />
+        </div>
       </StarknetProvider>
-    </EthereumProvider>
+    </AppKitProvider>
   );
 }
 

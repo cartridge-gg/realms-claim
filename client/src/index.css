@@ -118,3 +118,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+body{
+  background-image: url('/bg-image.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 100vh;
+  width: 100vw;
+}
