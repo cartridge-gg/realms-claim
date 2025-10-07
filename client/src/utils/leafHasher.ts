@@ -1,27 +1,39 @@
-import { hash, ec } from 'starknet';
+import { hash, ec, selector } from 'starknet';
 
 /**
  * Hash leaf data to match Cairo implementation
  * Uses Poseidon hash followed by Pedersen hash
+ *
+ * MUST match Cairo LeafData<T> serialization:
+ * [address, index, claim_contract_address, entrypoint, data.length, ...data]
  */
 export function hashLeaf(
   address: string,
   index: number,
+  claimContract: string,
+  entrypoint: string,
   claimData: string[]
 ): string {
-  // Prepare elements for hashing: [address, index, length, ...claim_data]
+  // Convert entrypoint to selector (felt252)
+  const entrypointSelector = selector.getSelectorFromName(entrypoint);
+
+  // Prepare elements for hashing to match Cairo LeafData<EthAddress> serialization
   const elements = [
-    address,
-    index.toString(),
-    claimData.length.toString(),
-    ...claimData
+    address,                          // address (EthAddress)
+    index.toString(),                 // index (u32)
+    claimContract,                    // claim_contract_address (ContractAddress)
+    entrypointSelector,               // entrypoint (felt252)
+    claimData.length.toString(),      // data.length (u32)
+    ...claimData                      // data elements (Array<felt252>)
   ];
 
   // Use Poseidon hash (matching Cairo's poseidon_hash_span)
   const poseidonHash = hash.computePoseidonHashOnElements(elements);
 
-  // Finalize with Pedersen(poseidon_hash, 0) - matching Cairo
-  const finalHash = hash.computePedersenHash(poseidonHash, '0x0');
+  // Finalize with Pedersen hash (matching Cairo's LeafDataHashImpl)
+  // Cairo: pedersen(0, hash_state.update_with(hashed).update_with(1).finalize())
+  const hashState = hash.computePedersenHash(poseidonHash, '0x1');
+  const finalHash = hash.computePedersenHash('0x0', hashState);
 
   return finalHash;
 }

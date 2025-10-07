@@ -3,14 +3,10 @@ import { useAccount, useSignMessage } from 'wagmi';
 import { useAccount as useStarknetAccount } from '@starknet-react/core';
 import { hashLeaf } from '../utils/leafHasher';
 import { MerkleTree } from '../utils/merkleTree';
-import { createOwnershipMessage } from '../utils/ethereumSigning';
-
-interface SnapshotData {
-  name: string;
-  network: string;
-  description: string;
-  snapshot: [string, string[]][];
-}
+import { createClaimMessage, parseSignature } from '../utils/ethereumSigning';
+import { claimWithForwarder } from '../utils/contract/forwarder';
+import { buildMerkleTreeKey } from '../utils/contract/types';
+import type { SnapshotData } from '../types/snapshot';
 
 interface ClaimInfo {
   address: string;
@@ -22,14 +18,19 @@ interface SigningState {
   leafHash: string | null;
   merkleRoot: string | null;
   merkleProof: string[] | null;
-  ethereumSignature: string | null;
-  ownershipMessage: string | null;
-  appSignature: { r: string; s: string } | null;
+  ethereumSignature: { v: number; r: string; s: string } | null;
+  claimMessage: string | null;
+}
+
+interface TransactionState {
+  status: 'idle' | 'pending' | 'success' | 'error';
+  hash: string | null;
+  error: string | null;
 }
 
 export function EligibilityChecker() {
   const { address: ethAddress, isConnected } = useAccount();
-  const { address: starknetAddress } = useStarknetAccount();
+  const { address: starknetAddress, account } = useStarknetAccount();
   const { signMessageAsync } = useSignMessage();
 
   const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
@@ -40,8 +41,12 @@ export function EligibilityChecker() {
     merkleRoot: null,
     merkleProof: null,
     ethereumSignature: null,
-    ownershipMessage: null,
-    appSignature: null
+    claimMessage: null
+  });
+  const [txState, setTxState] = useState<TransactionState>({
+    status: 'idle',
+    hash: null,
+    error: null
   });
   const [showSigningDemo, setShowSigningDemo] = useState(false);
 
@@ -85,26 +90,52 @@ export function EligibilityChecker() {
 
   // Generate leaf hash and prepare signing data
   const handlePrepareSigningData = () => {
-    if (!claimInfo || !snapshot) return;
+    console.log('🔴 BUTTON CLICKED - handlePrepareSigningData called!');
+
+    if (!claimInfo || !snapshot) {
+      console.error('Missing claimInfo or snapshot', { claimInfo, snapshot });
+      alert('Missing claim info or snapshot data');
+      return;
+    }
+
+    console.log('Starting signing data preparation...', {
+      address: claimInfo.address,
+      index: claimInfo.index,
+      claim_contract: snapshot.claim_contract,
+      entrypoint: snapshot.entrypoint,
+      claimData: claimInfo.claimData
+    });
 
     try {
-      // 1. Generate leaf hash
+      // 1. Generate leaf hash (with claim_contract and entrypoint)
+      console.log('Generating leaf hash...');
       const leafHash = hashLeaf(
         claimInfo.address,
         claimInfo.index,
+        snapshot.claim_contract,
+        snapshot.entrypoint,
         claimInfo.claimData
       );
+      console.log('Leaf hash generated:', leafHash);
 
       // 2. Build Merkle tree from all leaves
+      console.log('Building Merkle tree from', snapshot.snapshot.length, 'leaves...');
+      console.log('⏳ About to hash all leaves...');
       const allLeaves = snapshot.snapshot.map(([addr, data], idx) =>
-        hashLeaf(addr, idx, data)
+        hashLeaf(addr, idx, snapshot.claim_contract, snapshot.entrypoint, data)
       );
+      console.log('✅ All leaves hashed, creating tree...');
       const merkleTree = new MerkleTree(allLeaves);
+      console.log('✅ Tree created, getting root and proof...');
       const merkleRoot = merkleTree.root;
       const merkleProof = merkleTree.getProof(claimInfo.index);
+      console.log('✅ Merkle tree built. Root:', merkleRoot, 'Proof length:', merkleProof.length);
 
       // 3. Verify proof locally
+      console.log('Verifying proof locally...');
       const isValidProof = MerkleTree.verify(leafHash, merkleProof, merkleRoot);
+      console.log('Proof verification result:', isValidProof);
+
       if (!isValidProof) {
         alert('Merkle proof verification failed!');
         return;
@@ -117,63 +148,127 @@ export function EligibilityChecker() {
         merkleProof
       }));
 
+      console.log('Signing state updated, showing demo...');
       setShowSigningDemo(true);
     } catch (error) {
       console.error('Error preparing signing data:', error);
-      alert('Error preparing signing data');
+      alert(`Error preparing signing data: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  // Sign with Ethereum wallet
+  // Sign claim message with Ethereum wallet
   const handleSignWithEthereum = async () => {
+    console.log('🔵 handleSignWithEthereum called', { ethAddress, starknetAddress });
+
     if (!ethAddress || !starknetAddress) {
+      console.error('Missing wallet addresses:', { ethAddress, starknetAddress });
       alert('Please connect both Ethereum and Starknet wallets');
       return;
     }
 
     try {
-      const timestamp = Date.now();
-      const message = createOwnershipMessage(
-        ethAddress,
-        starknetAddress,
-        timestamp
+      // Create the message that matches the contract format
+      console.log('Creating claim message...');
+      const message = createClaimMessage(starknetAddress);
+      console.log('Message created:', message);
+
+      // Sign with Ethereum wallet
+      console.log('Requesting signature from Ethereum wallet...');
+      console.log('signMessageAsync function:', signMessageAsync);
+
+      if (!signMessageAsync) {
+        throw new Error('signMessageAsync is not available. Is the Ethereum wallet connected?');
+      }
+
+      // Add a timeout wrapper to detect if the wallet isn't responding
+      const signaturePromise = signMessageAsync({ message });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Wallet signing timeout - check if MetaMask popup is open')), 60000)
       );
 
-      const signature = await signMessageAsync({ message });
+      console.log('⏳ Waiting for wallet signature... (check for MetaMask popup)');
+      const signature = await Promise.race([signaturePromise, timeoutPromise]);
+      console.log('Signature received:', signature);
+
+      // Parse signature into (v, r, s)
+      console.log('Parsing signature...');
+      const parsed = parseSignature(signature);
+      console.log('Signature parsed:', parsed);
 
       setSigningState(prev => ({
         ...prev,
-        ethereumSignature: signature,
-        ownershipMessage: message
+        ethereumSignature: parsed,
+        claimMessage: message
       }));
+      console.log('✅ Signing state updated successfully');
     } catch (error) {
       console.error('Error signing message:', error);
       alert('Failed to sign message');
     }
   };
 
-  // Simulate backend app signature
-  const handleSimulateAppSignature = () => {
-    if (!signingState.leafHash) {
-      alert('Please generate leaf hash first');
+  // Submit claim transaction to Starknet
+  const handleSubmitClaim = async () => {
+    if (!signingState.ethereumSignature || !signingState.merkleProof || !claimInfo || !snapshot || !starknetAddress) {
+      alert('Please complete all signing steps first');
       return;
     }
 
-    // In production, your backend would:
-    // 1. Receive the leaf hash
-    // 2. Verify eligibility
-    // 3. Sign with app's private key
-    // 4. Return signature
+    // Check we have the required environment variables
+    const forwarderAddress = import.meta.env.VITE_FORWARDER_CONTRACT_ADDRESS;
+    if (!forwarderAddress) {
+      alert('VITE_FORWARDER_CONTRACT_ADDRESS not set in environment variables');
+      return;
+    }
 
-    setSigningState(prev => ({
-      ...prev,
-      appSignature: {
-        r: '0x1234...', // Backend would provide real signature
-        s: '0x5678...'  // Backend would provide real signature
+    try {
+      setTxState({ status: 'pending', hash: null, error: null });
+
+      // Check Starknet account is connected
+      if (!account) {
+        throw new Error('Starknet account not connected');
       }
-    }));
 
-    alert('In production, your backend would sign the leaf hash with the app private key and return the signature (r, s)');
+      // Build MerkleTreeKey
+      const merkleTreeKey = buildMerkleTreeKey(
+        snapshot.claim_contract,
+        snapshot.entrypoint,
+        snapshot.contract_address // use contract_address as salt
+      );
+
+      // Build LeafData
+      const leafData = {
+        address: claimInfo.address,
+        index: claimInfo.index,
+        claim_contract_address: snapshot.claim_contract,
+        entrypoint: snapshot.entrypoint,
+        data: claimInfo.claimData
+      };
+
+      // Submit transaction
+      const result = await claimWithForwarder(
+        account as any, // Type assertion needed due to AccountInterface vs Account
+        forwarderAddress,
+        merkleTreeKey,
+        signingState.merkleProof,
+        leafData,
+        starknetAddress,
+        signingState.ethereumSignature
+      );
+
+      setTxState({
+        status: 'success',
+        hash: result.transaction_hash,
+        error: null
+      });
+    } catch (error: any) {
+      console.error('Error submitting claim:', error);
+      setTxState({
+        status: 'error',
+        hash: null,
+        error: error.message || 'Failed to submit claim transaction'
+      });
+    }
   };
 
   if (loading) {
@@ -282,7 +377,10 @@ export function EligibilityChecker() {
                 You are eligible to claim! Click below to see how the signing process works.
               </p>
               <button
-                onClick={handlePrepareSigningData}
+                onClick={() => {
+                  console.log('🟢 BUTTON ONCLICK FIRED!');
+                  handlePrepareSigningData();
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Show Signing Demo
@@ -354,95 +452,133 @@ export function EligibilityChecker() {
                   )}
                 </div>
 
-                {/* Step 3: Backend App Signature */}
+                {/* Step 3: Sign Claim Message with Ethereum */}
                 <div className="mb-6 p-4 bg-white rounded-lg border border-purple-200">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-bold text-purple-900">Step 3:</span>
-                    <span className="text-sm text-gray-700">Backend App Signature</span>
-                    {signingState.appSignature && <span className="ml-auto text-green-600">✓</span>}
+                    <span className="text-sm text-gray-700">Sign Claim Message</span>
+                    {signingState.ethereumSignature && <span className="ml-auto text-green-600">✓</span>}
                   </div>
                   <p className="text-xs text-gray-600 mb-3">
-                    Your backend signs the leaf hash with the app's private key to authorize the claim.
+                    Sign a message with your Ethereum wallet to authorize the claim to your Starknet address.
                   </p>
                   <button
-                    onClick={handleSimulateAppSignature}
-                    disabled={!signingState.leafHash}
-                    className="px-3 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    onClick={handleSignWithEthereum}
+                    disabled={!starknetAddress || !signingState.leafHash}
+                    className="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                   >
-                    Simulate Backend Signature
+                    {!starknetAddress ? 'Connect Starknet Wallet First' : 'Sign with Ethereum Wallet'}
                   </button>
-                  {signingState.appSignature && (
+                  {signingState.claimMessage && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-gray-600 mb-1">Message Signed:</p>
+                      <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                        {signingState.claimMessage}
+                      </pre>
+                    </div>
+                  )}
+                  {signingState.ethereumSignature && (
                     <div className="mt-3 space-y-2">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600">Signature V:</p>
+                        <p className="font-mono text-xs bg-gray-50 p-2 rounded">
+                          {signingState.ethereumSignature.v}
+                        </p>
+                      </div>
                       <div>
                         <p className="text-xs font-semibold text-gray-600">Signature R:</p>
                         <p className="font-mono text-xs bg-gray-50 p-2 rounded break-all">
-                          {signingState.appSignature.r}
+                          {signingState.ethereumSignature.r}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-gray-600">Signature S:</p>
                         <p className="font-mono text-xs bg-gray-50 p-2 rounded break-all">
-                          {signingState.appSignature.s}
+                          {signingState.ethereumSignature.s}
                         </p>
                       </div>
-                      <p className="text-xs text-orange-600 mt-2">
-                        ⚠️ This is a demo. In production, your backend API would provide the real signature.
+                      <p className="text-xs text-green-600 mt-2">
+                        ✓ Ethereum signature created! This authorizes the claim to your Starknet address.
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Step 4: Ethereum Ownership Proof */}
-                <div className="mb-6 p-4 bg-white rounded-lg border border-purple-200">
+                {/* Step 4: Submit Claim Transaction */}
+                <div className="mb-6 p-4 bg-white rounded-lg border border-green-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="font-bold text-purple-900">Step 4:</span>
-                    <span className="text-sm text-gray-700">Ethereum Ownership Proof</span>
-                    {signingState.ethereumSignature && <span className="ml-auto text-green-600">✓</span>}
+                    <span className="font-bold text-green-900">Step 4:</span>
+                    <span className="text-sm text-gray-700">Submit Claim Transaction</span>
+                    {txState.status === 'success' && <span className="ml-auto text-green-600">✓</span>}
                   </div>
                   <p className="text-xs text-gray-600 mb-3">
-                    Sign a message with your Ethereum wallet to prove you own the address in the snapshot.
+                    Submit the claim transaction to the Starknet forwarder contract.
                   </p>
                   <button
-                    onClick={handleSignWithEthereum}
-                    disabled={!starknetAddress}
-                    className="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    onClick={handleSubmitClaim}
+                    disabled={!signingState.ethereumSignature || !signingState.merkleProof || txState.status === 'pending' || txState.status === 'success'}
+                    className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                   >
-                    {starknetAddress ? 'Sign with Ethereum Wallet' : 'Connect Starknet Wallet First'}
+                    {txState.status === 'pending' ? 'Submitting...' : txState.status === 'success' ? 'Claimed!' : 'Claim on Starknet'}
                   </button>
-                  {signingState.ownershipMessage && (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-1">Message Signed:</p>
-                      <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
-                        {signingState.ownershipMessage}
-                      </pre>
+
+                  {/* Transaction Status */}
+                  {txState.status === 'pending' && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <p className="text-sm text-blue-800">
+                        ⏳ Transaction pending... Please confirm in your Starknet wallet.
+                      </p>
                     </div>
                   )}
-                  {signingState.ethereumSignature && (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-1">Signature:</p>
-                      <p className="font-mono text-xs bg-gray-50 p-2 rounded break-all">
-                        {signingState.ethereumSignature}
+
+                  {txState.status === 'success' && txState.hash && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                      <p className="text-sm font-semibold text-green-900 mb-2">
+                        ✅ Claim successful!
                       </p>
-                      <p className="text-xs text-green-600 mt-2">
-                        ✓ Signature created! This proves you control the Ethereum address.
+                      <p className="text-xs text-gray-700 mb-1">Transaction Hash:</p>
+                      <p className="font-mono text-xs bg-white p-2 rounded break-all mb-2">
+                        {txState.hash}
+                      </p>
+                      <a
+                        href={`https://starkscan.co/tx/${txState.hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        View on Starkscan →
+                      </a>
+                    </div>
+                  )}
+
+                  {txState.status === 'error' && txState.error && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                      <p className="text-sm font-semibold text-red-900 mb-1">
+                        ❌ Transaction failed
+                      </p>
+                      <p className="text-xs text-red-700">
+                        {txState.error}
                       </p>
                     </div>
                   )}
                 </div>
 
                 {/* Summary */}
-                <div className="p-4 bg-green-50 border border-green-300 rounded-lg">
-                  <h4 className="font-bold text-green-900 mb-2">📋 Summary</h4>
+                <div className="p-4 bg-blue-50 border border-blue-300 rounded-lg">
+                  <h4 className="font-bold text-blue-900 mb-2">📋 How It Works</h4>
                   <div className="text-sm text-gray-700 space-y-2">
-                    <p>To claim on Starknet, you need:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>Campaign ID (from snapshot)</li>
-                      <li>Leaf Data (address, index, claim_data)</li>
-                      <li>Merkle Proof ({signingState.merkleProof?.length || 0} hashes)</li>
-                      <li>App Signature (r, s) from backend</li>
+                    <p>The claim process verifies:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                      <li>Your Ethereum address is in the snapshot (Merkle proof)</li>
+                      <li>You own the Ethereum address (Ethereum signature)</li>
+                      <li>The claim goes to your specified Starknet address</li>
+                      <li>You haven't claimed before (on-chain check)</li>
                     </ul>
                     <p className="mt-3 text-xs text-gray-600">
-                      The contract verifies: caller matches address, proof is valid, signature is valid, and leaf hasn't been claimed before.
+                      <strong>Merkle Proof:</strong> {signingState.merkleProof?.length || 0} sibling hashes that prove your address is in the tree.
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      <strong>Cross-chain:</strong> Ethereum signature authorizes the claim on Starknet.
                     </p>
                   </div>
                 </div>

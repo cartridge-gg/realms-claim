@@ -1,25 +1,40 @@
 [package]
-cairo-version = "2.12.2"
-name = "dojo_starter"
-version = "1.7.0"
+name = "merkle_drop"
+version = "0.1.0"
 edition = "2024_07"
 
-[cairo]
-sierra-replace-ids = true
+# See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [scripts]
-migrate = "sozo build && sozo migrate"
-spawn = "sozo execute dojo_starter-actions spawn --wait"
-move = "sozo execute dojo_starter-actions move -c 1 --wait"
+test = "snforge test"
 
 [dependencies]
-dojo = "1.7.0"
-dojo_cairo_macros = "1.7.0"
-starknet = "2.12.2"
+starknet = "2.12.0"
 
-[[target.starknet-contract]]
-build-external-contracts = ["dojo::world::world_contract::world"]
+openzeppelin_account = "2.0.0"
+openzeppelin_access = "2.0.0"
+openzeppelin_introspection = "2.0.0"
+openzeppelin_merkle_tree = "2.0.0"
+openzeppelin_upgrades = "2.0.0"
+openzeppelin_security = "2.0.0"
+openzeppelin_utils = "2.0.0"
+
+alexandria_bytes = "0.6.0"
+
 
 [dev-dependencies]
-cairo_test = "2.12.2"
-dojo_cairo_test = "1.7.0"
+snforge_std = "0.48.1"
+assert_macros = "2.12.0"
+
+
+[tool.scarb]
+allow-prebuilt-plugins = ["snforge_std"]
+
+[profile.dev.cairo]
+unstable-add-statements-code-locations-debug-info = true
+unstable-add-statements-functions-debug-info = true
+
+[[target.starknet-contract]]
+sierra = true
+casm = true
+
