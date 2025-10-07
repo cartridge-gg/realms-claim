@@ -42,12 +42,15 @@ pub mod actions {
     #[derive(Copy, Drop, Serde)]
     #[dojo::event]
     pub struct AppPublicKeySet {
+        #[key]
+        pub setter: ContractAddress,
         pub public_key: felt252,
     }
 
     #[derive(Copy, Drop, Serde)]
     #[dojo::event]
     pub struct DropInitialized {
+        #[key]
         pub campaign_id: felt252,
         pub merkle_root: felt252,
     }
@@ -63,7 +66,7 @@ pub mod actions {
             world.write_model(@app_key);
 
             // Emit event for public key registration.
-            world.emit_event(@AppPublicKeySet { public_key });
+            world.emit_event(@AppPublicKeySet { setter: get_caller_address(), public_key });
         }
 
         fn initialize_drop(ref self: ContractState, campaign_id: felt252, merkle_root: felt252) {
@@ -206,9 +209,12 @@ pub mod actions {
 
                 let proof_element = *proof.at(i);
 
-                // Hash in sorted order
+                // Hash in sorted order by comparing as u256
+                let hash_a: u256 = computed_hash.into();
+                let hash_b: u256 = proof_element.into();
+
                 computed_hash =
-                    if computed_hash < proof_element {
+                    if hash_a < hash_b {
                         pedersen(computed_hash, proof_element)
                     } else {
                         pedersen(proof_element, computed_hash)
