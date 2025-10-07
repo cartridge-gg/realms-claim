@@ -1,12 +1,15 @@
 import "./App.css";
-import { ConnectWallet } from "./components/connect";
 import { StarknetProvider } from "./stores/provider";
+import { EthereumProvider } from "./stores/ethereumProvider";
+import { WalletDashboard } from "./components/WalletDashboard";
 
 function App() {
   return (
-    <StarknetProvider>
-      <ConnectWallet />
-    </StarknetProvider>
+    <EthereumProvider>
+      <StarknetProvider>
+        <WalletDashboard />
+      </StarknetProvider>
+    </EthereumProvider>
   );
 }
 

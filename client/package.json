@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "generate-key": "bun scripts/generateKey.ts",
-    "setup-campaign": "bun scripts/setupCampaign.ts"
+    "setup-campaign": "bun scripts/setupCampaign.ts",
+    "test:claim-flow": "bun scripts/testClaimFlow.ts"
   },
   "dependencies": {
     "@cartridge/connector": "^0.10.7",
@@ -21,13 +22,18 @@
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",
     "@tailwindcss/vite": "^4.1.14",
+    "@tanstack/react-query": "^5.62.20",
+    "@wagmi/core": "^2.17.3",
+    "@web3modal/wagmi": "^6.3.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "starknet": "^8.5.5",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "viem": "^2.25.11",
+    "wagmi": "^2.14.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
