@@ -10,13 +10,15 @@ function AppContent() {
   const { connectors, connector, connectAsync } = useConnect();
   const { disconnect } = useDisconnect();
 
-  const handleMintStarterPack = () => {
-    connectAsync({ connector: connectors[0] });
+  const handleButtonClick = () => {
+    if (address) {
+      handleMintStarterPack();
+    } else {
+      connectAsync({ connector: connectors[0] });
+    }
   };
 
-  useEffect(() => {
-    if (!address) return;
-
+  const handleMintStarterPack = () => {
     // Open Cartridge starter pack claiming UI
     const starterpack = {
       name: "Beginner Pack",
@@ -39,10 +41,14 @@ function AppContent() {
       ],
     };
 
+    (connector as ControllerConnector).controller.openStarterPack(starterpack);
+  };
+
+  useEffect(() => {
+    if (!address) return;
+
     setTimeout(() => {
-      (connector as ControllerConnector).controller.openStarterPack(
-        starterpack
-      );
+      handleMintStarterPack();
     }, 300);
   }, [address]);
 
@@ -56,7 +62,7 @@ function AppContent() {
       </div>
       <div className="">
         <button
-          onClick={handleMintStarterPack}
+          onClick={handleButtonClick}
           className="px-12 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
         >
           <div className="flex flex-row gap-2">
