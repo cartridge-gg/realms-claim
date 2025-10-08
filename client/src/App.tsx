@@ -8,7 +8,6 @@ import { useEffect } from "react";
 function AppContent() {
   const { address } = useAccount();
   const { connectors, connector, connectAsync } = useConnect();
-  const { disconnect } = useDisconnect();
 
   const handleButtonClick = () => {
     if (address) {
@@ -66,9 +65,13 @@ function AppContent() {
           className="px-8 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
         >
           <div className="flex flex-row gap-2">
-            <span className="font-fell uppercase tracking-[0.15rem]">Claim</span>
+            <span className="font-fell uppercase tracking-[0.15rem]">
+              Claim
+            </span>
             <span className="font-fell-sc italic tracking-wider">your</span>
-            <span className="font-fell uppercase tracking-[0.15rem]">free game</span>
+            <span className="font-fell uppercase tracking-[0.15rem]">
+              free game
+            </span>
           </div>
         </button>
       </div>
