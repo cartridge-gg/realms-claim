@@ -24,19 +24,25 @@ source = "registry+https://scarbs.xyz/"
 checksum = "sha256:1e08ebba0ed9f7217b8efc283d2ad41730257cf41a47ca88a94fb0fafad22e9e"
 
 [[package]]
-name = "merkle_drop"
-version = "0.1.0"
+name = "dojo"
+version = "1.0.0"
+source = "git+https://github.com/dojoengine/dojo?tag=v1.0.0#74280d48fa2828095331487dede59f9b2e378cd3"
 dependencies = [
- "alexandria_bytes",
- "openzeppelin_access",
- "openzeppelin_account",
- "openzeppelin_introspection",
- "openzeppelin_merkle_tree",
- "openzeppelin_security",
- "openzeppelin_upgrades",
- "openzeppelin_utils",
- "snforge_std",
+ "dojo_plugin",
 ]
+
+[[package]]
+name = "dojo_cairo_test"
+version = "1.0.0-rc.0"
+source = "git+https://github.com/dojoengine/dojo?tag=v1.0.0#74280d48fa2828095331487dede59f9b2e378cd3"
+dependencies = [
+ "dojo",
+]
+
+[[package]]
+name = "dojo_plugin"
+version = "2.8.4"
+source = "git+https://github.com/dojoengine/dojo?tag=v1.0.0#74280d48fa2828095331487dede59f9b2e378cd3"
 
 [[package]]
 name = "openzeppelin_access"
@@ -88,16 +94,17 @@ source = "registry+https://scarbs.xyz/"
 checksum = "sha256:bf799c794139837f397975ffdf6a7ed5032d198bbf70e87a8f44f144a9dfc505"
 
 [[package]]
-name = "snforge_scarb_plugin"
-version = "0.48.1"
-source = "registry+https://scarbs.xyz/"
-checksum = "sha256:2dd27e8215eea8785b3930e9f452e11b429ca262b1c1fbb071bfc173b9ebc125"
-
-[[package]]
-name = "snforge_std"
-version = "0.48.1"
-source = "registry+https://scarbs.xyz/"
-checksum = "sha256:89f759fa685d48ed0ba7152d2ac2eb168da08dfa8b84b2bee96e203dc5b2413e"
+name = "realms_claim"
+version = "0.1.0"
 dependencies = [
- "snforge_scarb_plugin",
+ "alexandria_bytes",
+ "dojo",
+ "dojo_cairo_test",
+ "openzeppelin_access",
+ "openzeppelin_account",
+ "openzeppelin_introspection",
+ "openzeppelin_merkle_tree",
+ "openzeppelin_security",
+ "openzeppelin_upgrades",
+ "openzeppelin_utils",
 ]

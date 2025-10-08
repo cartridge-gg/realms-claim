@@ -35,10 +35,10 @@ mod ClaimContract {
         balance: Map<(felt252, ContractAddress), u32>,
     }
 
-    // #[constructor]
-    // fn constructor(ref self: ContractState, forwarder_address: ContractAddress) {
-    //     self.forwarder_address.write(forwarder_address);
-    // }
+    #[constructor]
+    fn constructor(ref self: ContractState, forwarder_address: ContractAddress) {
+        self.forwarder_address.write(forwarder_address);
+    }
 
     #[abi(embed_v0)]
     impl ClaimImpl of IClaim<ContractState> {
@@ -64,8 +64,8 @@ mod ClaimContract {
             let amount = data.token_ids.len();
 
             // increase balance
-            let balance = self.balance.entry(('TOKEN_A', recipient)).read();
-            self.balance.entry(('TOKEN_A', recipient)).write(balance + amount);
+            // let balance = self.balance.entry(('TOKEN_A', recipient)).read();
+            // self.balance.entry(('TOKEN_A', recipient)).write(balance + amount);
         }
 
         fn claim_from_forwarder_with_extra_data(
@@ -79,12 +79,12 @@ mod ClaimContract {
             let data = Serde::<LeafDataWithExtraData>::deserialize(ref leaf_data).unwrap();
 
             // increase TOKEN_A balance
-            let balance = self.balance.entry(('TOKEN_A', recipient)).read();
-            self.balance.entry(('TOKEN_A', recipient)).write(balance + data.amount_A);
+            // let balance = self.balance.entry(('TOKEN_A', recipient)).read();
+            // self.balance.entry(('TOKEN_A', recipient)).write(balance + data.amount_A);
 
-            // increase TOKEN_b balance
-            let balance = self.balance.entry(('TOKEN_B', recipient)).read();
-            self.balance.entry(('TOKEN_B', recipient)).write(balance + data.amount_B);
+            // // increase TOKEN_b balance
+            // let balance = self.balance.entry(('TOKEN_B', recipient)).read();
+            // self.balance.entry(('TOKEN_B', recipient)).write(balance + data.amount_B);
         }
     }
 

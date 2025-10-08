@@ -1,19 +1,19 @@
 [world]
-name = "Dojo starter"
-description = "The official Dojo Starter guide, the quickest and most streamlined way to get your Dojo Autonomous World up and running. This guide will assist you with the initial setup, from cloning the repository to deploying your world."
+name = "Realms Claim"
+description = "A Merkle Drop claim system for cross-chain token distribution using Ethereum signatures and Starknet."
 cover_uri = "file://assets/cover.png"
 icon_uri = "file://assets/icon.png"
-website = "https://github.com/dojoengine/dojo-starter"
-seed = "dojo_starter"
+website = "https://github.com/dojoengine/realms-claim"
+seed = "realms_claim"
 
 [world.socials]
 x = "https://x.com/ohayo_dojo"
 discord = "https://discord.gg/FB2wR6uF"
-github = "https://github.com/dojoengine/dojo-starter"
+github = "https://github.com/dojoengine/realms-claim"
 telegram = "https://t.me/dojoengine"
 
 [namespace]
-default = "dojo_starter"
+default = "realms_claim"
 
 [env]
 rpc_url = "http://localhost:5050/"
@@ -23,4 +23,6 @@ private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
 # world_address = "0x06171ed98331e849d6084bf2b3e3186a7ddf35574dd68cab4691053ee8ab69d7"
 
 [writers]
-"dojo_starter" = ["dojo_starter-actions"]
+# Grant write permissions to claim system only
+# The forwarder contract exists at 0x50a858cf7abee543a5709f789a0b01482bfe940d65bb12aa13fabf65e048a26
+"realms_claim-claim_actions" = ["Campaign", "Claim", "Balance"]
