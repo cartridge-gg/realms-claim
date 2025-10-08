@@ -24,6 +24,14 @@ pub struct LeafDataWithExtraData {
 
 #[starknet::contract]
 mod ClaimContract {
+    use realms_claim::constants::contracts::{
+        LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, PISTOLS_DUEL_ADDRESS,
+    };
+    use realms_claim::constants::interface::{
+        CharacterKey, DuelistProfile, ILootSurvivorDispatcher, ILootSurvivorDispatcherTrait,
+        ILordsTokenDispatcher, ILordsTokenDispatcherTrait, IPistolsDuelDispatcher,
+        IPistolsDuelDispatcherTrait, PaymentType, PoolType,
+    };
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
@@ -58,14 +66,10 @@ mod ClaimContract {
 
             // deserialize leaf_data
             let mut leaf_data = leaf_data;
-            let data = Serde::<LeafData>::deserialize(ref leaf_data).unwrap();
+            let _data = Serde::<LeafData>::deserialize(ref leaf_data).unwrap();
 
-            // then use recipient / data
-            let amount = data.token_ids.len();
-
-            // increase balance
-            // let balance = self.balance.entry(('TOKEN_A', recipient)).read();
-            // self.balance.entry(('TOKEN_A', recipient)).write(balance + amount);
+            // mint both tokens
+            self.mint_tokens(recipient);
         }
 
         fn claim_from_forwarder_with_extra_data(
@@ -76,15 +80,10 @@ mod ClaimContract {
 
             // deserialize leaf_data
             let mut leaf_data = leaf_data;
-            let data = Serde::<LeafDataWithExtraData>::deserialize(ref leaf_data).unwrap();
+            let _data = Serde::<LeafDataWithExtraData>::deserialize(ref leaf_data).unwrap();
 
-            // increase TOKEN_A balance
-            // let balance = self.balance.entry(('TOKEN_A', recipient)).read();
-            // self.balance.entry(('TOKEN_A', recipient)).write(balance + data.amount_A);
-
-            // // increase TOKEN_b balance
-            // let balance = self.balance.entry(('TOKEN_B', recipient)).read();
-            // self.balance.entry(('TOKEN_B', recipient)).write(balance + data.amount_B);
+            // mint both tokens
+            self.mint_tokens(recipient);
         }
     }
 
@@ -95,6 +94,53 @@ mod ClaimContract {
             let caller = starknet::get_caller_address();
             let forwarder_address = self.forwarder_address.read();
             assert!(caller == forwarder_address, "caller is not forwarder");
+        }
+
+        fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
+            // Mint 100 LORDS tokens
+            let lords_token = ILordsTokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
+            lords_token.mint(recipient, 386);
+
+            // Mint 3 Loot Survivor game via buy_game with Ticket payment
+            let loot_survivor = ILootSurvivorDispatcher {
+                contract_address: LOOT_SURVIVOR_ADDRESS(),
+            };
+            loot_survivor
+                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
+            loot_survivor
+                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
+            loot_survivor
+                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
+
+            // Mint Pistols duelists
+            let pistols_duel = IPistolsDuelDispatcher { contract_address: PISTOLS_DUEL_ADDRESS() };
+            pistols_duel
+                .mint_duelists(
+                    recipient,
+                    1,
+                    DuelistProfile::Character(CharacterKey::Player),
+                    0,
+                    PoolType::Claimable,
+                    100,
+                );
+            pistols_duel
+                .mint_duelists(
+                    recipient,
+                    1,
+                    DuelistProfile::Character(CharacterKey::Player),
+                    0,
+                    PoolType::Claimable,
+                    100,
+                );
+            pistols_duel
+                .mint_duelists(
+                    recipient,
+                    1,
+                    DuelistProfile::Character(CharacterKey::Player),
+                    0,
+                    PoolType::Claimable,
+                    100,
+                );
         }
     }
 }

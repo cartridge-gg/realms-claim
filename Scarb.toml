@@ -6,12 +6,10 @@ edition = "2024_07"
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [scripts]
-test = "sozo test"
+test = "snforge test"
 
 [dependencies]
 starknet = "2.12.0"
-dojo = { git = "https://github.com/dojoengine/dojo", tag = "v1.0.0" }
-
 openzeppelin_account = "2.0.0"
 openzeppelin_access = "2.0.0"
 openzeppelin_introspection = "2.0.0"
@@ -23,19 +21,9 @@ openzeppelin_utils = "2.0.0"
 alexandria_bytes = "0.6.0"
 
 [dev-dependencies]
-dojo = { git = "https://github.com/dojoengine/dojo", tag = "v1.0.0" }
-dojo_cairo_test = { git = "https://github.com/dojoengine/dojo", tag = "v1.0.0" }
+snforge_std = "0.38.0"
 
-[tool.dojo]
-initializer_class_hash = "0xbeef"
-
-[tool.dojo.env]
-rpc_url = "http://localhost:5050/"
-account_address = "0xb3ff441a68610b30fd5e2abbf3a1548eb6ba6f3559f2862bf2dc757e5828ca"
-private_key = "0x2bbf4f9fd0bbb2e60b0316c1fe0b76cf7a4d0198bd493ced9b8df2a3a24d68a"
-world_address = "0x0"
-
-[[target.dojo]]
+[[target.starknet-contract]]
 
 [profile.dev.cairo]
 unstable-add-statements-code-locations-debug-info = true

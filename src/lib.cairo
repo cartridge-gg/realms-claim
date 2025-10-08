@@ -1,7 +1,11 @@
-// Models
-pub mod models;
-
-// Systems
-pub mod systems {
-    pub mod claim;
+// Constants
+pub mod constants {
+    pub mod contracts;
+    pub mod interface;
 }
+
+pub mod tests {
+    pub mod tests;
+}
+
+pub mod main;
