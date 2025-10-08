@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "generate-key": "bun scripts/generateKey.ts",
+    "generate-proofs": "bun scripts/generateProofs.ts",
     "transform-snapshot": "bun scripts/transformSnapshot.ts",
     "setup-campaign": "bun scripts/setupCampaign.ts",
     "test:claim-flow": "bun scripts/testClaimFlow.ts"

@@ -3,7 +3,33 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: 'IM Fell English SC';
+  src: url('/src/assets/fonts/IMFellEnglishSC-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IM Fell English';
+  src: url('/src/assets/fonts/IMFellEnglish-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IM Fell English';
+  src: url('/src/assets/fonts/IMFellEnglish-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme inline {
+  --font-family-fell-sc: 'IM Fell English SC', serif;
+  --font-family-fell: 'IM Fell English', serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -116,6 +142,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'IM Fell English', serif;
   }
 }
 
@@ -126,5 +153,7 @@ body{
   background-position: center;
   background-repeat: no-repeat;
   height: 100vh;
+  max-height: 100vh;
   width: 100vw;
+  overflow: hidden;
 }

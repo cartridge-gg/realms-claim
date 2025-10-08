@@ -1,55 +1,85 @@
 import "./App.css";
 import { StarknetProvider } from "./stores/provider";
-import { ConnectWallet } from "./components/connect-stark";
-import { AppKitProvider } from "./stores/ethProvider";
-import ConnectButton from "./components/connect-eth";
-import { EligibilityChecker } from "./components/EligibilityChecker";
+import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
+import { StarterPackItemType } from "@cartridge/controller";
+import type ControllerConnector from "@cartridge/connector/controller";
+
+function AppContent() {
+  const { address } = useAccount();
+  const { connectors, connector, connectAsync } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  const handleMintStarterPack = () => {
+    // Open Cartridge starter pack claiming UI
+    const starterpack = {
+      name: "Beginner Pack",
+      description: "Essential items for new players",
+      acquisitionType: "CLAIMED",
+      items: [
+        {
+          type: StarterPackItemType.FUNGIBLE,
+          name: "LORDS",
+          description: "In-game currency",
+          amount: 100,
+          call: [
+            {
+              contractAddress: "0x123...",
+              entrypoint: "mint",
+              calldata: ["user", "100", "0"],
+            },
+          ],
+        },
+      ],
+    };
+    (connector as ControllerConnector).controller.openStarterPack(starterpack);
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat relative flex flex-col justify-between p-8">
+      {/* Centered button */}
+      <div className="flex flex-row gap-4 justify-center items-center">
+        <img src="/src/assets/pirate.svg" alt="Pirate" className="w-12 h-12" />
+        <img src="/src/assets/cross.svg" alt="Cross" className="w-4 h-4" />
+        <img src="/src/assets/realms.svg" alt="Realms" className="w-12 h-12" />
+      </div>
+      <div className="">
+        <button
+          onClick={
+            address
+              ? handleMintStarterPack
+              : () => connectAsync({ connector: connectors[0] })
+          }
+          className="px-12 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
+        >
+          {address ? (
+            <div className="flex flex-row gap-2">
+              <span className="font-fell uppercase ">Claim</span>
+              <span className="font-fell-sc italic tracking-wider">your</span>
+              <span className="font-fell uppercase">free pack</span>
+            </div>
+          ) : (
+            <div className="flex flex-row gap-2">
+              <span className="font-fell uppercase ">Connect Wallet</span>
+            </div>
+          )}
+        </button>
+      </div>
+      <div>
+        {address ? (
+          <button className="bg-white" onClick={() => disconnect()}>
+            disconnect
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
-    <AppKitProvider>
-      <StarknetProvider>
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="text-center">
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                Realms Claim Portal
-              </h1>
-              <p className="text-gray-600">
-                Check your eligibility for Pirate Nation claims
-              </p>
-            </div>
-
-            {/* Wallet Connections */}
-            <div className="flex justify-center items-center gap-8 flex-wrap">
-              <div className="p-6 bg-white rounded-lg shadow border-2 border-orange-200">
-                <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">
-                  Starknet Wallet
-                </h3>
-                <ConnectWallet />
-              </div>
-              <div className="p-6 bg-white rounded-lg shadow border-2 border-blue-200">
-                <h3 className="text-sm font-semibold text-gray-600 mb-3 text-center">
-                  Ethereum Wallet
-                </h3>
-                <ConnectButton />
-              </div>
-            </div>
-
-            {/* Eligibility Checker */}
-            <EligibilityChecker />
-
-            {/* Info Footer */}
-            <div className="text-center text-sm text-gray-500 pt-8 border-t border-gray-200">
-              <p>
-                Connect your Ethereum wallet to check if you're eligible for the claim
-              </p>
-            </div>
-          </div>
-        </div>
-      </StarknetProvider>
-    </AppKitProvider>
+    <StarknetProvider>
+      <AppContent />
+    </StarknetProvider>
   );
 }
 
