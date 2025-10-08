@@ -3,6 +3,7 @@ import { StarknetProvider } from "./stores/provider";
 import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { StarterPackItemType } from "@cartridge/controller";
 import type ControllerConnector from "@cartridge/connector/controller";
+import { useEffect } from "react";
 
 function AppContent() {
   const { address } = useAccount();
@@ -10,6 +11,12 @@ function AppContent() {
   const { disconnect } = useDisconnect();
 
   const handleMintStarterPack = () => {
+    connectAsync({ connector: connectors[0] });
+  };
+
+  useEffect(() => {
+    if (!address) return;
+
     // Open Cartridge starter pack claiming UI
     const starterpack = {
       name: "Beginner Pack",
@@ -31,8 +38,13 @@ function AppContent() {
         },
       ],
     };
-    (connector as ControllerConnector).controller.openStarterPack(starterpack);
-  };
+
+    setTimeout(() => {
+      (connector as ControllerConnector).controller.openStarterPack(
+        starterpack
+      );
+    }, 300);
+  }, [address]);
 
   return (
     <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat relative flex flex-col justify-between p-8">
@@ -44,24 +56,14 @@ function AppContent() {
       </div>
       <div className="">
         <button
-          onClick={
-            address
-              ? handleMintStarterPack
-              : () => connectAsync({ connector: connectors[0] })
-          }
+          onClick={handleMintStarterPack}
           className="px-12 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
         >
-          {address ? (
-            <div className="flex flex-row gap-2">
-              <span className="font-fell uppercase ">Claim</span>
-              <span className="font-fell-sc italic tracking-wider">your</span>
-              <span className="font-fell uppercase">free pack</span>
-            </div>
-          ) : (
-            <div className="flex flex-row gap-2">
-              <span className="font-fell uppercase ">Connect Wallet</span>
-            </div>
-          )}
+          <div className="flex flex-row gap-2">
+            <span className="font-fell uppercase ">Claim</span>
+            <span className="font-fell-sc italic tracking-wider">your</span>
+            <span className="font-fell uppercase">free pack</span>
+          </div>
         </button>
       </div>
       <div>

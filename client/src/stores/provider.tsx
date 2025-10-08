@@ -12,18 +12,18 @@ const ETH_TOKEN_ADDRESS =
 
 // Define session policies
 const policies = {
-  contracts: {
-    [ETH_TOKEN_ADDRESS]: {
-      methods: [
-        {
-          name: "approve",
-          entrypoint: "approve",
-          description: "Approve spending of tokens",
-        },
-        { name: "transfer", entrypoint: "transfer" },
-      ],
-    },
-  },
+  // contracts: {
+  //   [ETH_TOKEN_ADDRESS]: {
+  //     methods: [
+  //       {
+  //         name: "approve",
+  //         entrypoint: "approve",
+  //         description: "Approve spending of tokens",
+  //       },
+  //       { name: "transfer", entrypoint: "transfer" },
+  //     ],
+  //   },
+  // },
 };
 
 // Initialize the connector
