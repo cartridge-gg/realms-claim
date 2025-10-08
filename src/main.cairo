@@ -97,9 +97,10 @@ mod ClaimContract {
         }
 
         fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
-            // Mint 100 LORDS tokens
+            // Mint 386 LORDS tokens
+            let lords_amount: u256 = 386 * 1000000000000000000;
             let lords_token = ILordsTokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
-            lords_token.mint(recipient, 386);
+            lords_token.mint(recipient, lords_amount);
 
             // Mint 3 Loot Survivor game via buy_game with Ticket payment
             let loot_survivor = ILootSurvivorDispatcher {

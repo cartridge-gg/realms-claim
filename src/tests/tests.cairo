@@ -62,7 +62,7 @@ mod tests {
         assert(
             LOOT_SURVIVOR_ADDRESS()
                 == contract_address_const::<
-                    0x5e2dfbdc3c193de629e5beb116083b06bd944c1608c9c793351d5792ba29863,
+                    0x00a67ef20b61a9846e1c82b411175e6ab167ea9f8632bd6c2091823c3629ec42,
                 >(),
             'wrong LOOT_SURVIVOR address',
         );
