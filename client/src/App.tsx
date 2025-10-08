@@ -4,6 +4,9 @@ import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
 import { StarterPackItemType } from "@cartridge/controller";
 import type ControllerConnector from "@cartridge/connector/controller";
 import { useEffect } from "react";
+import pirateSvg from "./assets/pirate.svg";
+import crossSvg from "./assets/cross.svg";
+import realmsSvg from "./assets/realms.svg";
 
 function AppContent() {
   const { address } = useAccount();
@@ -55,9 +58,9 @@ function AppContent() {
     <div className="h-full w-full bg-cover bg-center bg-no-repeat relative flex flex-col justify-between p-8">
       {/* Centered button */}
       <div className="flex flex-row gap-4 justify-center items-center">
-        <img src="/src/assets/pirate.svg" alt="Pirate" className="w-12 h-12" />
-        <img src="/src/assets/cross.svg" alt="Cross" className="w-4 h-4" />
-        <img src="/src/assets/realms.svg" alt="Realms" className="w-12 h-12" />
+        <img src={pirateSvg} alt="Pirate" className="w-12 h-12" />
+        <img src={crossSvg} alt="Cross" className="w-4 h-4" />
+        <img src={realmsSvg} alt="Realms" className="w-12 h-12" />
       </div>
       <div className=" fixed top-1/2 left-1/2 -translate-x-1/2">
         <button
