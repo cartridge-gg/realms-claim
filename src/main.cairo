@@ -28,9 +28,8 @@ mod ClaimContract {
         LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, PISTOLS_DUEL_ADDRESS,
     };
     use realms_claim::constants::interface::{
-        CharacterKey, DuelistProfile, ILootSurvivorDispatcher, ILootSurvivorDispatcherTrait,
-        ILordsTokenDispatcher, ILordsTokenDispatcherTrait, IPistolsDuelDispatcher,
-        IPistolsDuelDispatcherTrait, PaymentType, PoolType,
+        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, IPistolsDuelDispatcher,
+        IPistolsDuelDispatcherTrait,
     };
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -63,11 +62,6 @@ mod ClaimContract {
         ) {
             // MUST check caller is forwarder
             self.assert_caller_is_forwarder();
-
-            // deserialize leaf_data
-            let mut leaf_data = leaf_data;
-            let _data = Serde::<LeafData>::deserialize(ref leaf_data).unwrap();
-
             // mint both tokens
             self.mint_tokens(recipient);
         }
@@ -77,11 +71,6 @@ mod ClaimContract {
         ) {
             // MUST check caller is forwarder
             self.assert_caller_is_forwarder();
-
-            // deserialize leaf_data
-            let mut leaf_data = leaf_data;
-            let _data = Serde::<LeafDataWithExtraData>::deserialize(ref leaf_data).unwrap();
-
             // mint both tokens
             self.mint_tokens(recipient);
         }
@@ -97,51 +86,22 @@ mod ClaimContract {
         }
 
         fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
-            // Mint 386 LORDS tokens
+            let contract_address = starknet::get_contract_address();
+
+            // Transfer 386 LORDS tokens from this contract to recipient
             let lords_amount: u256 = 386 * 1000000000000000000;
-            let lords_token = ILordsTokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
-            lords_token.mint(recipient, lords_amount);
+            let lords_token = IERC20TokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
+            lords_token.transfer_from(contract_address, recipient, lords_amount);
 
             // Mint 3 Loot Survivor game via buy_game with Ticket payment
-            let loot_survivor = ILootSurvivorDispatcher {
-                contract_address: LOOT_SURVIVOR_ADDRESS(),
-            };
-            loot_survivor
-                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
-            loot_survivor
-                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
-            loot_survivor
-                .buy_game(PaymentType::Ticket, Option::Some('Adventurer'), recipient, false);
+            let loot_survivor = IERC20TokenDispatcher { contract_address: LOOT_SURVIVOR_ADDRESS() };
+            loot_survivor.transfer_from(contract_address, recipient, 3);
 
-            // Mint Pistols duelists
+            // Claim Pistols starter packs (3x)
             let pistols_duel = IPistolsDuelDispatcher { contract_address: PISTOLS_DUEL_ADDRESS() };
-            pistols_duel
-                .mint_duelists(
-                    recipient,
-                    1,
-                    DuelistProfile::Character(CharacterKey::Player),
-                    0,
-                    PoolType::Claimable,
-                    100,
-                );
-            pistols_duel
-                .mint_duelists(
-                    recipient,
-                    1,
-                    DuelistProfile::Character(CharacterKey::Player),
-                    0,
-                    PoolType::Claimable,
-                    100,
-                );
-            pistols_duel
-                .mint_duelists(
-                    recipient,
-                    1,
-                    DuelistProfile::Character(CharacterKey::Player),
-                    0,
-                    PoolType::Claimable,
-                    100,
-                );
+            pistols_duel.claim_starter_pack();
+            pistols_duel.claim_starter_pack();
+            pistols_duel.claim_starter_pack();
         }
     }
 }

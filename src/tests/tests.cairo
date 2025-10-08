@@ -62,7 +62,7 @@ mod tests {
         assert(
             LOOT_SURVIVOR_ADDRESS()
                 == contract_address_const::<
-                    0x00a67ef20b61a9846e1c82b411175e6ab167ea9f8632bd6c2091823c3629ec42,
+                    0x035f581b050a39958b7188ab5c75daaa1f9d3571a0c032203038c898663f31f8,
                 >(),
             'wrong LOOT_SURVIVOR address',
         );
@@ -70,7 +70,7 @@ mod tests {
         assert(
             PISTOLS_DUEL_ADDRESS()
                 == contract_address_const::<
-                    0x07aaa9866750a0db82a54ba8674c38620fa2f967d2fbb31133def48e0527c87f,
+                    0x071333ac75b7d5ba89a2d0c2b67d5b955258a4d46eb42f3428da6137bbbfdfd9,
                 >(),
             'wrong PISTOLS_DUEL address',
         );
