@@ -146,14 +146,13 @@
   }
 }
 
+html, body {margin: 0; height: 100%; overflow: hidden}
+
 
 body{
   background-image: url('/bg-image.webp');
-  background-size: cover;
-  background-position: center;
+  background-position: center 70%;
   background-repeat: no-repeat;
-  height: 100vh;
-  max-height: 100vh;
-  width: 100vw;
+  background-size: cover; 
   overflow: hidden;
 }

@@ -53,31 +53,31 @@ function AppContent() {
   }, [address]);
 
   return (
-    <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat relative flex flex-col justify-between p-8">
+    <div className="h-full w-full bg-cover bg-center bg-no-repeat relative flex flex-col justify-between p-8">
       {/* Centered button */}
       <div className="flex flex-row gap-4 justify-center items-center">
         <img src="/src/assets/pirate.svg" alt="Pirate" className="w-12 h-12" />
         <img src="/src/assets/cross.svg" alt="Cross" className="w-4 h-4" />
         <img src="/src/assets/realms.svg" alt="Realms" className="w-12 h-12" />
       </div>
-      <div className="">
+      <div className=" fixed top-1/2 left-1/2 -translate-x-1/2">
         <button
           onClick={handleButtonClick}
-          className="px-12 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
+          className="px-8 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
         >
           <div className="flex flex-row gap-2">
-            <span className="font-fell uppercase ">Claim</span>
+            <span className="font-fell uppercase tracking-[0.15rem]">Claim</span>
             <span className="font-fell-sc italic tracking-wider">your</span>
-            <span className="font-fell uppercase">free pack</span>
+            <span className="font-fell uppercase tracking-[0.15rem]">free game</span>
           </div>
         </button>
       </div>
       <div>
-        {address ? (
+        {/* {address ? (
           <button className="bg-white" onClick={() => disconnect()}>
             disconnect
           </button>
-        ) : null}
+        ) : null} */}
       </div>
     </div>
   );
