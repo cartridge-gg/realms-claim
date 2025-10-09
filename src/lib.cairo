@@ -12,8 +12,6 @@ pub mod tests {
 pub mod mocks {
     pub mod simple_erc20;
     pub mod simple_erc721;
-    pub mod mock_lords;
-    pub mod mock_loot_survivor;
 }
 
 pub mod main;

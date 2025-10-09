@@ -1,65 +1,50 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-pub trait ISimpleERC721<TContractState> {
+pub trait ISimpleERC721Mint<TContractState> {
     fn mint(ref self: TContractState, to: ContractAddress, token_id: u256);
-    fn transfer_from(
-        ref self: TContractState, from: ContractAddress, to: ContractAddress, token_id: u256,
-    );
-    fn owner_of(self: @TContractState, token_id: u256) -> ContractAddress;
-    fn approve(ref self: TContractState, to: ContractAddress, token_id: u256);
 }
 
 #[starknet::contract]
 mod SimpleERC721 {
-    use core::num::traits::Zero;
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-    };
+    use openzeppelin_introspection::src5::SRC5Component;
+    use openzeppelin_token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
+    use starknet::ContractAddress;
+
+    component!(path: ERC721Component, storage: erc721, event: ERC721Event);
+    component!(path: SRC5Component, storage: src5, event: SRC5Event);
+
+    // ERC721 Mixin
+    #[abi(embed_v0)]
+    impl ERC721MixinImpl = ERC721Component::ERC721MixinImpl<ContractState>;
+    impl ERC721InternalImpl = ERC721Component::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
-        owners: Map<u256, ContractAddress>,
-        approvals: Map<u256, ContractAddress>,
+        #[substorage(v0)]
+        erc721: ERC721Component::Storage,
+        #[substorage(v0)]
+        src5: SRC5Component::Storage,
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        #[flat]
+        ERC721Event: ERC721Component::Event,
+        #[flat]
+        SRC5Event: SRC5Component::Event,
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState) {}
+    fn constructor(ref self: ContractState, name: ByteArray, symbol: ByteArray, base_uri: ByteArray) {
+        self.erc721.initializer(name, symbol, base_uri);
+    }
 
     #[abi(embed_v0)]
-    impl SimpleERC721Impl of super::ISimpleERC721<ContractState> {
+    impl SimpleERC721MintImpl of super::ISimpleERC721Mint<ContractState> {
         fn mint(ref self: ContractState, to: ContractAddress, token_id: u256) {
-            assert(self.owners.entry(token_id).read().is_zero(), 'token already minted');
-            self.owners.entry(token_id).write(to);
-        }
-
-        fn transfer_from(
-            ref self: ContractState,
-            from: ContractAddress,
-            to: ContractAddress,
-            token_id: u256,
-        ) {
-            let owner = self.owners.entry(token_id).read();
-            assert(owner == from, 'not owner');
-
-            let caller = get_caller_address();
-            let approved = self.approvals.entry(token_id).read();
-            assert(caller == owner || caller == approved, 'not approved');
-
-            self.owners.entry(token_id).write(to);
-            self.approvals.entry(token_id).write(Zero::zero());
-        }
-
-        fn owner_of(self: @ContractState, token_id: u256) -> ContractAddress {
-            self.owners.entry(token_id).read()
-        }
-
-        fn approve(ref self: ContractState, to: ContractAddress, token_id: u256) {
-            let owner = self.owners.entry(token_id).read();
-            let caller = get_caller_address();
-            assert(caller == owner, 'not owner');
-            self.approvals.entry(token_id).write(to);
+            self.erc721.mint(to, token_id);
         }
     }
 }

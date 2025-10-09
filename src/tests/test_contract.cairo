@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod test_contract {
+    use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin_token::erc721::interface::{IERC721Dispatcher, IERC721DispatcherTrait};
     use realms_claim::main::{IClaimDispatcher, IClaimDispatcherTrait};
-    use realms_claim::mocks::simple_erc20::{ISimpleERC20Dispatcher, ISimpleERC20DispatcherTrait};
-    use realms_claim::mocks::simple_erc721::{ISimpleERC721Dispatcher, ISimpleERC721DispatcherTrait};
+    use realms_claim::mocks::simple_erc721::{
+        ISimpleERC721MintDispatcher, ISimpleERC721MintDispatcherTrait,
+    };
     use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address};
     use starknet::{ContractAddress, contract_address_const};
 
@@ -24,25 +27,33 @@ mod test_contract {
 
     fn deploy_mock_token(
         name: ByteArray, symbol: ByteArray, initial_recipient: ContractAddress,
-    ) -> ISimpleERC20Dispatcher {
+    ) -> IERC20Dispatcher {
         let contract_class = declare("SimpleERC20").unwrap().contract_class();
         let initial_supply: u256 = 10000 * 1000000000000000000; // 10,000 tokens
 
         let mut calldata = array![];
         name.serialize(ref calldata);
         symbol.serialize(ref calldata);
-        calldata.append(18); // decimals
-        calldata.append(initial_recipient.into());
         Serde::serialize(@initial_supply, ref calldata);
+        calldata.append(initial_recipient.into());
 
         let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
-        ISimpleERC20Dispatcher { contract_address }
+        IERC20Dispatcher { contract_address }
     }
 
-    fn deploy_mock_nft() -> ISimpleERC721Dispatcher {
+    fn deploy_mock_nft() -> (IERC721Dispatcher, ISimpleERC721MintDispatcher) {
         let contract_class = declare("SimpleERC721").unwrap().contract_class();
-        let (contract_address, _) = contract_class.deploy(@array![]).unwrap();
-        ISimpleERC721Dispatcher { contract_address }
+        let name: ByteArray = "Mock Pistols";
+        let symbol: ByteArray = "mPISTOLS";
+        let base_uri: ByteArray = "";
+
+        let mut calldata = array![];
+        name.serialize(ref calldata);
+        symbol.serialize(ref calldata);
+        base_uri.serialize(ref calldata);
+
+        let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
+        (IERC721Dispatcher { contract_address }, ISimpleERC721MintDispatcher { contract_address })
     }
 
     fn PISTOLS() -> ContractAddress {
@@ -111,7 +122,7 @@ mod test_contract {
         // Deploy mock tokens, NFT contract, and claim contract (OWNER is treasury)
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
-        let mock_pistols = deploy_mock_nft();
+        let (mock_pistols, mock_pistols_mint) = deploy_mock_nft();
 
         let claim_contract = deploy_claim_contract(
             mock_lords.contract_address,
@@ -121,11 +132,9 @@ mod test_contract {
         );
 
         // Pre-mint 3 Pistols NFTs directly to claim contract (no approval needed!)
-        start_cheat_caller_address(mock_pistols.contract_address, OWNER());
-        mock_pistols.mint(claim_contract.contract_address, 101);
-        mock_pistols.mint(claim_contract.contract_address, 102);
-        mock_pistols.mint(claim_contract.contract_address, 103);
-        snforge_std::stop_cheat_caller_address(mock_pistols.contract_address);
+        mock_pistols_mint.mint(claim_contract.contract_address, 101);
+        mock_pistols_mint.mint(claim_contract.contract_address, 102);
+        mock_pistols_mint.mint(claim_contract.contract_address, 103);
 
         // Verify claim contract owns the NFTs
         assert(
@@ -187,7 +196,7 @@ mod test_contract {
     // ========================================
 
     #[test]
-    #[should_panic(expected: ('Insufficient allowance',))]
+    #[should_panic(expected: ('ERC20: insufficient allowance',))]
     fn test_insufficient_allowance_fails() {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
