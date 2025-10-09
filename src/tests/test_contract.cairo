@@ -141,12 +141,8 @@ mod test_contract {
         snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
         // Execute claim as FORWARDER
-        // Pass leaf hash as seed for deterministic randomness
-        // In production, this would be the actual leaf hash from merkle tree
-        let leaf_hash: felt252 = core::poseidon::poseidon_hash_span(
-            array![RECIPIENT().into(), 12345].span()
-        );
-        let leaf_data = array![leaf_hash].span();
+        // No leaf_data needed - Pistols team handles randomness internally
+        let leaf_data = array![].span();
 
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
         claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);

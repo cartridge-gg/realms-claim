@@ -2,7 +2,7 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait ISimpleERC721Mint<TContractState> {
-    fn promo_airdrop(ref self: TContractState, to: ContractAddress, seed: felt252) -> u128;
+    fn mint_to(ref self: TContractState, to: ContractAddress);
     fn mint_with_id(ref self: TContractState, to: ContractAddress, token_id: u256);
 }
 
@@ -47,14 +47,12 @@ mod SimpleERC721 {
 
     #[abi(embed_v0)]
     impl SimpleERC721MintImpl of super::ISimpleERC721Mint<ContractState> {
-        // Promo airdrop function - mints 1 pack with auto-incremented token_id
-        // This simulates the Pistols team's promo_airdrop function that mints 1 pack (5 Duelists)
-        // The seed parameter would be used for randomness in the real implementation
-        fn promo_airdrop(ref self: ContractState, to: ContractAddress, seed: felt252) -> u128 {
+        // Mint to function - mints 1 pack with auto-incremented token_id
+        // This simulates the Pistols team's mint_to function that mints 1 pack (5 Duelists)
+        fn mint_to(ref self: ContractState, to: ContractAddress) {
             let token_id = self.next_token_id.read();
             self.erc721.mint(to, token_id);
             self.next_token_id.write(token_id + 1);
-            token_id.try_into().unwrap() // Return pack_id as u128
         }
 
         // Helper for tests that need specific token IDs

@@ -101,14 +101,14 @@ mod ClaimContract {
             // MUST check caller is forwarder
             self.accesscontrol.assert_only_role(FORWARDER_ROLE);
             // Transfer tokens and mint NFT pack
-            self.mint_tokens(recipient, leaf_data);
+            self.mint_tokens(recipient);
         }
     }
 
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn mint_tokens(self: @ContractState, recipient: ContractAddress, leaf_data: Span<felt252>) {
+        fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
             let treasury = self.treasury_address.read();
 
             // Transfer 386 LORDS tokens from treasury to recipient
@@ -124,20 +124,13 @@ mod ClaimContract {
             };
             loot_survivor.transfer_from(treasury, recipient, 3 * TEN_POW_18);
 
-            // Call Pistols promo_airdrop with leaf hash as seed
-            // The seed ensures each recipient gets unique, deterministic randomness
-            // leaf_data[0] should contain the leaf hash from the forwarder
-            let seed: felt252 = if leaf_data.len() > 0 {
-                *leaf_data.at(0)
-            } else {
-                // Fallback: hash the recipient address if no leaf_data provided
-                core::poseidon::poseidon_hash_span(array![recipient.into()].span())
-            };
-
+            // Call Pistols mint_to function
+            // The Pistols team will handle randomness and minting logic internally
+            // Mints 1 pack (5 Duelists) to the recipient
             let pistols = ITokenInterfaceDispatcher {
                 contract_address: self.pistols_address.read(),
             };
-            pistols.promo_airdrop(recipient, seed);
+            pistols.mint_to(recipient);
         }
     }
 
