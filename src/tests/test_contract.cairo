@@ -175,6 +175,80 @@ mod test_contract {
     }
 
     // ========================================
+    // Admin Update Functions Tests
+    // ========================================
+
+    #[test]
+    fn test_owner_can_update_lords_address() {
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+        );
+
+        let new_lords_address = contract_address_const::<'NEW_LORDS'>();
+        start_cheat_caller_address(claim_contract.contract_address, OWNER());
+        claim_contract.update_lords_token_address(new_lords_address);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
+    }
+
+    #[test]
+    #[should_panic(expected: ('Caller is missing role',))]
+    fn test_non_owner_cannot_update_lords_address() {
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+        );
+
+        let new_lords_address = contract_address_const::<'NEW_LORDS'>();
+        start_cheat_caller_address(claim_contract.contract_address, RECIPIENT());
+        claim_contract.update_lords_token_address(new_lords_address);
+    }
+
+    #[test]
+    fn test_owner_can_update_loot_survivor_address() {
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+        );
+
+        let new_ls_address = contract_address_const::<'NEW_LS'>();
+        start_cheat_caller_address(claim_contract.contract_address, OWNER());
+        claim_contract.update_loot_survivor_address(new_ls_address);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
+    }
+
+    #[test]
+    fn test_owner_can_update_pistols_address() {
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+        );
+
+        let new_pistols_address = contract_address_const::<'NEW_PISTOLS'>();
+        start_cheat_caller_address(claim_contract.contract_address, OWNER());
+        claim_contract.update_pistols_address(new_pistols_address);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
+    }
+
+    #[test]
+    fn test_owner_can_update_treasury_address() {
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+        );
+
+        let new_treasury_address = contract_address_const::<'NEW_TREASURY'>();
+        start_cheat_caller_address(claim_contract.contract_address, OWNER());
+        claim_contract.update_treasury_address(new_treasury_address);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
+    }
+
+    // ========================================
     // Error Case Tests
     // ========================================
 

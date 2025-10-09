@@ -7,6 +7,10 @@ pub trait IClaim<T> {
     fn initialize(ref self: T, forwarder_address: ContractAddress);
     fn get_balance(self: @T, key: felt252, address: ContractAddress) -> u32;
     fn claim_from_forwarder(ref self: T, recipient: ContractAddress, leaf_data: Span<felt252>);
+    fn update_lords_token_address(ref self: T, new_address: ContractAddress);
+    fn update_loot_survivor_address(ref self: T, new_address: ContractAddress);
+    fn update_pistols_address(ref self: T, new_address: ContractAddress);
+    fn update_treasury_address(ref self: T, new_address: ContractAddress);
 }
 
 #[starknet::contract]
@@ -102,6 +106,26 @@ mod ClaimContract {
             self.accesscontrol.assert_only_role(FORWARDER_ROLE);
             // Transfer tokens and mint NFT pack
             self.mint_tokens(recipient);
+        }
+
+        fn update_lords_token_address(ref self: ContractState, new_address: ContractAddress) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.lords_token_address.write(new_address);
+        }
+
+        fn update_loot_survivor_address(ref self: ContractState, new_address: ContractAddress) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.loot_survivor_address.write(new_address);
+        }
+
+        fn update_pistols_address(ref self: ContractState, new_address: ContractAddress) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.pistols_address.write(new_address);
+        }
+
+        fn update_treasury_address(ref self: ContractState, new_address: ContractAddress) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.treasury_address.write(new_address);
         }
     }
 
