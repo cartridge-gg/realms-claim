@@ -1,4 +1,6 @@
-use starknet::ContractAddress;
+use starknet::{ClassHash, ContractAddress};
+
+const FORWARDER_ROLE: felt252 = selector!("FORWARDER_ROLE");
 
 #[starknet::interface]
 pub trait IClaim<T> {
@@ -9,6 +11,10 @@ pub trait IClaim<T> {
 
 #[starknet::contract]
 mod ClaimContract {
+    use openzeppelin_access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
+    use openzeppelin_introspection::src5::SRC5Component;
+    use openzeppelin_upgrades::UpgradeableComponent;
+    use openzeppelin_upgrades::interface::IUpgradeable;
     use realms_claim::constants::contracts::{
         LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, PISTOLS_DUEL_ADDRESS,
     };
@@ -16,26 +22,58 @@ mod ClaimContract {
         IERC20TokenDispatcher, IERC20TokenDispatcherTrait, IPistolsDuelDispatcher,
         IPistolsDuelDispatcherTrait,
     };
-    use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-    };
+    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess};
     use super::*;
+
+    component!(path: SRC5Component, storage: src5, event: SRC5Event);
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+    component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
+
+    // External
+    #[abi(embed_v0)]
+    impl AccessControlMixinImpl =
+        AccessControlComponent::AccessControlMixinImpl<ContractState>;
+
+    // Internal
+    impl AccessControlInternalImpl = AccessControlComponent::InternalImpl<ContractState>;
+    impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
-        forwarder_address: ContractAddress,
         balance: Map<(felt252, ContractAddress), u32>,
+        #[substorage(v0)]
+        src5: SRC5Component::Storage,
+        #[substorage(v0)]
+        accesscontrol: AccessControlComponent::Storage,
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
     }
 
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        #[flat]
+        AccessControlEvent: AccessControlComponent::Event,
+        #[flat]
+        SRC5Event: SRC5Component::Event,
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event,
+    }
+
+
     #[constructor]
-    fn constructor(ref self: ContractState, forwarder_address: ContractAddress) {
-        self.forwarder_address.write(forwarder_address);
+    fn constructor(
+        ref self: ContractState, owner: ContractAddress, forwarder_address: ContractAddress,
+    ) {
+        self.accesscontrol.initializer();
+        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, owner);
+        self.accesscontrol._grant_role(FORWARDER_ROLE, forwarder_address);
     }
 
     #[abi(embed_v0)]
     impl ClaimImpl of IClaim<ContractState> {
         fn initialize(ref self: ContractState, forwarder_address: ContractAddress) {
-            self.forwarder_address.write(forwarder_address);
+            self.accesscontrol._grant_role(FORWARDER_ROLE, forwarder_address);
         }
 
         fn get_balance(self: @ContractState, key: felt252, address: ContractAddress) -> u32 {
@@ -46,7 +84,7 @@ mod ClaimContract {
             ref self: ContractState, recipient: ContractAddress, leaf_data: Span<felt252>,
         ) {
             // MUST check caller is forwarder
-            self.assert_caller_is_forwarder();
+            self.accesscontrol.assert_only_role(FORWARDER_ROLE);
             // mint both tokens
             self.mint_tokens(recipient);
         }
@@ -55,12 +93,6 @@ mod ClaimContract {
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn assert_caller_is_forwarder(self: @ContractState) {
-            let caller = starknet::get_caller_address();
-            let forwarder_address = self.forwarder_address.read();
-            assert!(caller == forwarder_address, "caller is not forwarder");
-        }
-
         fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
             let contract_address = starknet::get_contract_address();
 
@@ -78,6 +110,15 @@ mod ClaimContract {
             pistols_duel.claim_starter_pack();
             pistols_duel.claim_starter_pack();
             pistols_duel.claim_starter_pack();
+        }
+    }
+
+
+    #[abi(embed_v0)]
+    impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
+            self.upgradeable.upgrade(new_class_hash);
         }
     }
 }
