@@ -15,14 +15,17 @@ mod ClaimContract {
     use openzeppelin_introspection::src5::SRC5Component;
     use openzeppelin_upgrades::UpgradeableComponent;
     use openzeppelin_upgrades::interface::IUpgradeable;
-    use realms_claim::constants::contracts::{
-        LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, // PISTOLS_DUEL_ADDRESS,
-    };
+    // Token addresses are now configurable via constructor, no longer using constants
+    // use realms_claim::constants::contracts::{
+    //     LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, // PISTOLS_DUEL_ADDRESS,
+    // };
     use realms_claim::constants::interface::{
         IERC20TokenDispatcher, IERC20TokenDispatcherTrait, // IPistolsDuelDispatcher,
         // IPistolsDuelDispatcherTrait,
     };
-    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess
+    };
     use super::*;
 
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -41,6 +44,8 @@ mod ClaimContract {
     #[storage]
     struct Storage {
         balance: Map<(felt252, ContractAddress), u32>,
+        lords_token_address: ContractAddress,
+        loot_survivor_address: ContractAddress,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
         #[substorage(v0)]
@@ -63,11 +68,19 @@ mod ClaimContract {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState, owner: ContractAddress, forwarder_address: ContractAddress,
+        ref self: ContractState,
+        owner: ContractAddress,
+        forwarder_address: ContractAddress,
+        lords_token_address: ContractAddress,
+        loot_survivor_address: ContractAddress,
     ) {
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, owner);
         self.accesscontrol._grant_role(FORWARDER_ROLE, forwarder_address);
+
+        // Store token addresses
+        self.lords_token_address.write(lords_token_address);
+        self.loot_survivor_address.write(loot_survivor_address);
     }
 
     #[abi(embed_v0)]
@@ -98,11 +111,15 @@ mod ClaimContract {
 
             // Transfer 386 LORDS tokens from this contract to recipient
             let lords_amount: u256 = 386 * 1000000000000000000;
-            let lords_token = IERC20TokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
+            let lords_token = IERC20TokenDispatcher {
+                contract_address: self.lords_token_address.read()
+            };
             lords_token.transfer_from(contract_address, recipient, lords_amount);
 
             // Transfer 3 Loot Survivor tokens from this contract to recipient
-            let loot_survivor = IERC20TokenDispatcher { contract_address: LOOT_SURVIVOR_ADDRESS() };
+            let loot_survivor = IERC20TokenDispatcher {
+                contract_address: self.loot_survivor_address.read()
+            };
             loot_survivor.transfer_from(contract_address, recipient, 3);
 
             // TODO: Pistols Duel integration - currently disabled
