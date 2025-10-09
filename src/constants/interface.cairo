@@ -7,7 +7,9 @@ pub trait IERC20Token<T> {
     );
 }
 
-#[starknet::interface]
-pub trait IPistolsDuel<T> {
-    fn claim_starter_pack(ref self: T);
-}
+// Pistols Duel integration - currently disabled
+// See src/main.cairo for implementation notes
+// #[starknet::interface]
+// pub trait IPistolsDuel<T> {
+//     fn claim_starter_pack(ref self: T);
+// }

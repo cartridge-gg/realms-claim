@@ -16,11 +16,11 @@ mod ClaimContract {
     use openzeppelin_upgrades::UpgradeableComponent;
     use openzeppelin_upgrades::interface::IUpgradeable;
     use realms_claim::constants::contracts::{
-        LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, PISTOLS_DUEL_ADDRESS,
+        LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, // PISTOLS_DUEL_ADDRESS,
     };
     use realms_claim::constants::interface::{
-        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, IPistolsDuelDispatcher,
-        IPistolsDuelDispatcherTrait,
+        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, // IPistolsDuelDispatcher,
+        // IPistolsDuelDispatcherTrait,
     };
     use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess};
     use super::*;
@@ -101,15 +101,24 @@ mod ClaimContract {
             let lords_token = IERC20TokenDispatcher { contract_address: LORDS_TOKEN_ADDRESS() };
             lords_token.transfer_from(contract_address, recipient, lords_amount);
 
-            // Mint 3 Loot Survivor game via buy_game with Ticket payment
+            // Transfer 3 Loot Survivor tokens from this contract to recipient
             let loot_survivor = IERC20TokenDispatcher { contract_address: LOOT_SURVIVOR_ADDRESS() };
             loot_survivor.transfer_from(contract_address, recipient, 3);
 
-            // Claim Pistols starter packs (3x)
-            let pistols_duel = IPistolsDuelDispatcher { contract_address: PISTOLS_DUEL_ADDRESS() };
-            pistols_duel.claim_starter_pack();
-            pistols_duel.claim_starter_pack();
-            pistols_duel.claim_starter_pack();
+            // TODO: Pistols Duel integration - currently disabled
+            // Pistols contract does not have enumerable extension (no token_owner_by_index)
+            // Options for future implementation:
+            // 1. Use airdrop() if claim contract can be granted admin role
+            // 2. Use claim_starter_pack() + transfer pattern:
+            //    - Call claim_starter_pack() 3 times (mints to this contract)
+            //    - Use last_token_id() to get token IDs
+            //    - Transfer each token to recipient
+            // 3. Let users claim Pistols packs separately
+            //
+            // let pistols_duel = IPistolsDuelDispatcher { contract_address: PISTOLS_DUEL_ADDRESS() };
+            // pistols_duel.claim_starter_pack();
+            // pistols_duel.claim_starter_pack();
+            // pistols_duel.claim_starter_pack();
         }
     }
 
