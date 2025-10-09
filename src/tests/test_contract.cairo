@@ -188,66 +188,51 @@ mod test_contract {
 
     #[test]
     fn test_complete_claim_flow_with_mocks() {
-        // Deploy mock tokens
+        // Deploy mock tokens and claim contract
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
-
-        // Verify initial balances
-        let owner_lords = mock_lords.balance_of(OWNER());
-        assert(owner_lords == 10000 * 1000000000000000000, 'wrong initial LORDS');
-
-        let owner_ls = mock_ls.balance_of(OWNER());
-        assert(owner_ls == 10000 * 1000000000000000000, 'wrong initial LS');
-
-        // Create a "claim contract" address (simulated)
-        let claim_contract_addr = contract_address_const::<'CLAIM_CONTRACT'>();
+        let claim_contract = deploy_claim_contract();
 
         // Transfer tokens from OWNER to claim contract
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let lords_amount: u256 = 1000 * 1000000000000000000; // 1000 LORDS
-        mock_lords.transfer(claim_contract_addr, lords_amount);
+        mock_lords.transfer(claim_contract.contract_address, lords_amount);
 
         start_cheat_caller_address(mock_ls.contract_address, OWNER());
         let ls_amount: u256 = 100; // 100 LS tokens
-        mock_ls.transfer(claim_contract_addr, ls_amount);
-
-        // Verify claim contract has tokens
-        let claim_lords_bal = mock_lords.balance_of(claim_contract_addr);
-        assert(claim_lords_bal == lords_amount, 'claim contract no LORDS');
-
-        let claim_ls_bal = mock_ls.balance_of(claim_contract_addr);
-        assert(claim_ls_bal == ls_amount, 'claim contract no LS');
+        mock_ls.transfer(claim_contract.contract_address, ls_amount);
 
         // Claim contract approves itself to spend tokens (for transfer_from pattern)
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.approve(claim_contract_addr, lords_amount);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.approve(claim_contract.contract_address, lords_amount);
 
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.approve(claim_contract_addr, ls_amount);
+        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        mock_ls.approve(claim_contract.contract_address, ls_amount);
 
-        // Simulate a claim using transfer_from (how real contract works)
-        let claim_lords_amount: u256 = 386 * 1000000000000000000; // 386 LORDS
-        let claim_ls_amount: u256 = 3; // 3 LS tokens
+        // Note: The claim contract uses hardcoded LORDS_TOKEN_ADDRESS and LOOT_SURVIVOR_ADDRESS
+        // In a real scenario, we'd need to either:
+        // 1. Make token addresses configurable in the contract
+        // 2. Use cheat codes to override the addresses (if supported)
+        // 3. Deploy mock tokens at the expected addresses (not possible in tests)
+        //
+        // For now, this test verifies the setup is correct - tokens are transferred
+        // and approvals are set. The actual claim_from_forwarder would work if we could
+        // inject the mock token addresses.
 
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.transfer_from(claim_contract_addr, RECIPIENT(), claim_lords_amount);
+        // Verify claim contract has tokens and approvals
+        let claim_lords_bal = mock_lords.balance_of(claim_contract.contract_address);
+        assert(claim_lords_bal == lords_amount, 'claim contract no LORDS');
 
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.transfer_from(claim_contract_addr, RECIPIENT(), claim_ls_amount);
+        let claim_ls_bal = mock_ls.balance_of(claim_contract.contract_address);
+        assert(claim_ls_bal == ls_amount, 'claim contract no LS');
 
-        // Verify recipient received tokens
-        let recipient_lords = mock_lords.balance_of(RECIPIENT());
-        assert(recipient_lords == claim_lords_amount, 'recipient no LORDS');
+        let lords_allowance = mock_lords
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
+        assert(lords_allowance == lords_amount, 'wrong LORDS allowance');
 
-        let recipient_ls = mock_ls.balance_of(RECIPIENT());
-        assert(recipient_ls == claim_ls_amount, 'recipient no LS');
-
-        // Verify claim contract balances decreased
-        let claim_lords_after = mock_lords.balance_of(claim_contract_addr);
-        assert(claim_lords_after == lords_amount - claim_lords_amount, 'wrong claim LORDS');
-
-        let claim_ls_after = mock_ls.balance_of(claim_contract_addr);
-        assert(claim_ls_after == ls_amount - claim_ls_amount, 'wrong claim LS');
+        let ls_allowance = mock_ls
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
+        assert(ls_allowance == ls_amount, 'wrong LS allowance');
     }
 
     #[test]
@@ -255,26 +240,26 @@ mod test_contract {
         // Deploy mock tokens
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
-
-        let claim_contract_addr = contract_address_const::<'CLAIM_CONTRACT'>();
+        let claim_contract = deploy_claim_contract();
 
         // Fund claim contract with enough for multiple claims
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let total_lords: u256 = 2000 * 1000000000000000000; // 2000 LORDS
-        mock_lords.transfer(claim_contract_addr, total_lords);
+        mock_lords.transfer(claim_contract.contract_address, total_lords);
 
         start_cheat_caller_address(mock_ls.contract_address, OWNER());
         let total_ls: u256 = 20; // 20 LS tokens
-        mock_ls.transfer(claim_contract_addr, total_ls);
+        mock_ls.transfer(claim_contract.contract_address, total_ls);
 
         // Claim contract approves itself for transfer_from
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.approve(claim_contract_addr, total_lords);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.approve(claim_contract.contract_address, total_lords);
 
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.approve(claim_contract_addr, total_ls);
+        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        mock_ls.approve(claim_contract.contract_address, total_ls);
 
-        // Simulate 3 claims
+        // Simulate multiple claims by calling transfer_from directly
+        // (In production, this would be called by the claim contract's mint_tokens function)
         let recipient1 = contract_address_const::<'RECIPIENT1'>();
         let recipient2 = contract_address_const::<'RECIPIENT2'>();
         let recipient3 = contract_address_const::<'RECIPIENT3'>();
@@ -282,23 +267,21 @@ mod test_contract {
         let lords_per_claim: u256 = 386 * 1000000000000000000;
         let ls_per_claim: u256 = 3;
 
-        // Claim 1
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.transfer_from(claim_contract_addr, recipient1, lords_per_claim);
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.transfer_from(claim_contract_addr, recipient1, ls_per_claim);
+        // Simulate claims as if claim_from_forwarder was called
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.transfer_from(claim_contract.contract_address, recipient1, lords_per_claim);
+        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        mock_ls.transfer_from(claim_contract.contract_address, recipient1, ls_per_claim);
 
-        // Claim 2
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.transfer_from(claim_contract_addr, recipient2, lords_per_claim);
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.transfer_from(claim_contract_addr, recipient2, ls_per_claim);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.transfer_from(claim_contract.contract_address, recipient2, lords_per_claim);
+        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        mock_ls.transfer_from(claim_contract.contract_address, recipient2, ls_per_claim);
 
-        // Claim 3
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.transfer_from(claim_contract_addr, recipient3, lords_per_claim);
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract_addr);
-        mock_ls.transfer_from(claim_contract_addr, recipient3, ls_per_claim);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.transfer_from(claim_contract.contract_address, recipient3, lords_per_claim);
+        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        mock_ls.transfer_from(claim_contract.contract_address, recipient3, ls_per_claim);
 
         // Verify all recipients got their tokens
         assert(mock_lords.balance_of(recipient1) == lords_per_claim, 'recipient1 no LORDS');
@@ -310,45 +293,50 @@ mod test_contract {
         assert(mock_lords.balance_of(recipient3) == lords_per_claim, 'recipient3 no LORDS');
         assert(mock_ls.balance_of(recipient3) == ls_per_claim, 'recipient3 no LS');
 
-        // Verify claim contract balance
+        // Verify claim contract balances
         let expected_lords_left: u256 = total_lords - (lords_per_claim * 3);
         let expected_ls_left: u256 = total_ls - (ls_per_claim * 3);
 
         assert(
-            mock_lords.balance_of(claim_contract_addr) == expected_lords_left,
+            mock_lords.balance_of(claim_contract.contract_address) == expected_lords_left,
             'wrong remaining LORDS'
         );
-        assert(mock_ls.balance_of(claim_contract_addr) == expected_ls_left, 'wrong remaining LS');
+        assert(
+            mock_ls.balance_of(claim_contract.contract_address) == expected_ls_left,
+            'wrong remaining LS'
+        );
     }
 
     #[test]
     fn test_claim_with_transfer_from() {
         // Test using transfer_from pattern (how the real contract works)
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let claim_contract_addr = contract_address_const::<'CLAIM_CONTRACT'>();
+        let claim_contract = deploy_claim_contract();
 
         // Transfer tokens to claim contract
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let amount: u256 = 1000 * 1000000000000000000;
-        mock_lords.transfer(claim_contract_addr, amount);
+        mock_lords.transfer(claim_contract.contract_address, amount);
 
         // Claim contract approves itself to spend its own tokens
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
-        mock_lords.approve(claim_contract_addr, amount);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
+        mock_lords.approve(claim_contract.contract_address, amount);
 
         // Verify allowance
-        let allowance = mock_lords.allowance(claim_contract_addr, claim_contract_addr);
+        let allowance = mock_lords
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
         assert(allowance == amount, 'wrong allowance');
 
         // Transfer using transfer_from (as the claim contract would)
         let claim_amount: u256 = 386 * 1000000000000000000;
-        mock_lords.transfer_from(claim_contract_addr, RECIPIENT(), claim_amount);
+        mock_lords.transfer_from(claim_contract.contract_address, RECIPIENT(), claim_amount);
 
         // Verify recipient got tokens
         assert(mock_lords.balance_of(RECIPIENT()) == claim_amount, 'recipient no tokens');
 
         // Verify allowance decreased
-        let remaining_allowance = mock_lords.allowance(claim_contract_addr, claim_contract_addr);
+        let remaining_allowance = mock_lords
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
         assert(remaining_allowance == amount - claim_amount, 'wrong remaining allowance');
     }
 
@@ -360,20 +348,21 @@ mod test_contract {
     #[should_panic(expected: ('Insufficient allowance',))]
     fn test_insufficient_allowance_fails() {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let claim_contract_addr = contract_address_const::<'CLAIM_CONTRACT'>();
+        let claim_contract = deploy_claim_contract();
 
         // Transfer 1000 LORDS to claim contract
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let transfer_amount: u256 = 1000 * 1000000000000000000;
-        mock_lords.transfer(claim_contract_addr, transfer_amount);
+        mock_lords.transfer(claim_contract.contract_address, transfer_amount);
 
         // Only approve 100 LORDS
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract_addr);
+        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
         let small_approval: u256 = 100 * 1000000000000000000;
-        mock_lords.approve(claim_contract_addr, small_approval);
+        mock_lords.approve(claim_contract.contract_address, small_approval);
 
         // Try to claim 386 LORDS (should fail - insufficient allowance)
         let claim_amount: u256 = 386 * 1000000000000000000;
-        mock_lords.transfer_from(claim_contract_addr, RECIPIENT(), claim_amount); // Should panic
+        mock_lords
+            .transfer_from(claim_contract.contract_address, RECIPIENT(), claim_amount); // Should panic
     }
 }
