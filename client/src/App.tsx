@@ -21,29 +21,9 @@ function AppContent() {
   };
 
   const handleMintStarterPack = () => {
-    // Open Cartridge starter pack claiming UI
-    const starterpack = {
-      name: "Beginner Pack",
-      description: "Essential items for new players",
-      acquisitionType: "CLAIMED",
-      items: [
-        {
-          type: StarterPackItemType.FUNGIBLE,
-          name: "LORDS",
-          description: "In-game currency",
-          amount: 100,
-          call: [
-            {
-              contractAddress: "0x123...",
-              entrypoint: "mint",
-              calldata: ["user", "100", "0"],
-            },
-          ],
-        },
-      ],
-    };
-
-    (connector as ControllerConnector).controller.openStarterPack(starterpack);
+    (connector as ControllerConnector).controller.openStarterPack(
+      "pirate-nation-claim-sepolia"
+    );
   };
 
   useEffect(() => {
