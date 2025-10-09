@@ -129,14 +129,16 @@ mod ClaimContract {
             loot_survivor.transfer_from(treasury, recipient, 3);
 
             // Transfer Pistols NFTs using pre-minted token IDs from leaf_data
+            // NFTs are pre-minted directly to this claim contract (no approval needed)
             // leaf_data contains the token_ids array for this address
             let pistols = IERC721TokenDispatcher { contract_address: self.pistols_address.read() };
+            let contract_address = starknet::get_contract_address();
 
-            // Iterate through token_ids in leaf_data and transfer each NFT from treasury to recipient
+            // Iterate through token_ids in leaf_data and transfer each NFT from contract to recipient
             let mut i: u32 = 0;
             while i < leaf_data.len() {
                 let token_id: u256 = (*leaf_data.at(i)).into();
-                pistols.transfer_from(treasury, recipient, token_id);
+                pistols.transfer_from(contract_address, recipient, token_id);
                 i += 1;
             };
         }

@@ -280,17 +280,17 @@ mod test_contract {
             OWNER(),
         );
 
-        // Pre-mint 3 Pistols NFTs to treasury (OWNER) with specific token IDs
+        // Pre-mint 3 Pistols NFTs directly to claim contract (no approval needed!)
         start_cheat_caller_address(mock_pistols.contract_address, OWNER());
-        mock_pistols.mint(OWNER(), 101);
-        mock_pistols.mint(OWNER(), 102);
-        mock_pistols.mint(OWNER(), 103);
-
-        // Treasury approves claim contract for NFT transfers
-        mock_pistols.approve(claim_contract.contract_address, 101);
-        mock_pistols.approve(claim_contract.contract_address, 102);
-        mock_pistols.approve(claim_contract.contract_address, 103);
+        mock_pistols.mint(claim_contract.contract_address, 101);
+        mock_pistols.mint(claim_contract.contract_address, 102);
+        mock_pistols.mint(claim_contract.contract_address, 103);
         snforge_std::stop_cheat_caller_address(mock_pistols.contract_address);
+
+        // Verify claim contract owns the NFTs
+        assert(mock_pistols.owner_of(101) == claim_contract.contract_address, 'contract no NFT 101');
+        assert(mock_pistols.owner_of(102) == claim_contract.contract_address, 'contract no NFT 102');
+        assert(mock_pistols.owner_of(103) == claim_contract.contract_address, 'contract no NFT 103');
 
         // Treasury approves ERC20 tokens
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
