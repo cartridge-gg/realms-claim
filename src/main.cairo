@@ -6,7 +6,7 @@ const FORWARDER_ROLE: felt252 = selector!("FORWARDER_ROLE");
 pub trait IClaim<T> {
     fn initialize(ref self: T, forwarder_address: ContractAddress);
     fn get_balance(self: @T, key: felt252, address: ContractAddress) -> u32;
-    fn claim_from_forwarder(ref self: T, recipient: ContractAddress);
+    fn claim_from_forwarder(ref self: T, recipient: ContractAddress, leaf_data: Span<felt252>);
 }
 
 #[starknet::contract]
@@ -20,8 +20,8 @@ mod ClaimContract {
     //     LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, // PISTOLS_DUEL_ADDRESS,
     // };
     use realms_claim::constants::interface::{
-        IERC20TokenDispatcher, IERC20TokenDispatcherTrait // IPistolsDuelDispatcher,
-        // IPistolsDuelDispatcherTrait,
+        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, IERC721TokenDispatcher,
+        IERC721TokenDispatcherTrait,
     };
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -46,6 +46,7 @@ mod ClaimContract {
         balance: Map<(felt252, ContractAddress), u32>,
         lords_token_address: ContractAddress,
         loot_survivor_address: ContractAddress,
+        pistols_address: ContractAddress,
         treasury_address: ContractAddress,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
@@ -74,6 +75,7 @@ mod ClaimContract {
         forwarder_address: ContractAddress,
         lords_token_address: ContractAddress,
         loot_survivor_address: ContractAddress,
+        pistols_address: ContractAddress,
         treasury_address: ContractAddress,
     ) {
         self.accesscontrol.initializer();
@@ -83,6 +85,7 @@ mod ClaimContract {
         // Store token and treasury addresses
         self.lords_token_address.write(lords_token_address);
         self.loot_survivor_address.write(loot_survivor_address);
+        self.pistols_address.write(pistols_address);
         self.treasury_address.write(treasury_address);
     }
 
@@ -96,18 +99,20 @@ mod ClaimContract {
             self.balance.entry((key, address)).read()
         }
 
-        fn claim_from_forwarder(ref self: ContractState, recipient: ContractAddress) {
+        fn claim_from_forwarder(
+            ref self: ContractState, recipient: ContractAddress, leaf_data: Span<felt252>,
+        ) {
             // MUST check caller is forwarder
             self.accesscontrol.assert_only_role(FORWARDER_ROLE);
-            // mint both tokens
-            self.mint_tokens(recipient);
+            // Transfer tokens and NFTs
+            self.mint_tokens(recipient, leaf_data);
         }
     }
 
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
+        fn mint_tokens(self: @ContractState, recipient: ContractAddress, leaf_data: Span<felt252>) {
             let treasury = self.treasury_address.read();
 
             // Transfer 386 LORDS tokens from treasury to recipient
@@ -122,21 +127,18 @@ mod ClaimContract {
                 contract_address: self.loot_survivor_address.read(),
             };
             loot_survivor.transfer_from(treasury, recipient, 3);
-            // TODO: Pistols Duel integration - currently disabled
-        // Pistols contract does not have enumerable extension (no token_owner_by_index)
-        // Options for future implementation:
-        // 1. Use airdrop() if claim contract can be granted admin role
-        // 2. Use claim_starter_pack() + transfer pattern:
-        //    - Call claim_starter_pack() 3 times (mints to this contract)
-        //    - Use last_token_id() to get token IDs
-        //    - Transfer each token to recipient
-        // 3. Let users claim Pistols packs separately
-        //
-        // let pistols_duel = IPistolsDuelDispatcher { contract_address: PISTOLS_DUEL_ADDRESS()
-        // };
-        // pistols_duel.claim_starter_pack();
-        // pistols_duel.claim_starter_pack();
-        // pistols_duel.claim_starter_pack();
+
+            // Transfer Pistols NFTs using pre-minted token IDs from leaf_data
+            // leaf_data contains the token_ids array for this address
+            let pistols = IERC721TokenDispatcher { contract_address: self.pistols_address.read() };
+
+            // Iterate through token_ids in leaf_data and transfer each NFT from treasury to recipient
+            let mut i: u32 = 0;
+            while i < leaf_data.len() {
+                let token_id: u256 = (*leaf_data.at(i)).into();
+                pistols.transfer_from(treasury, recipient, token_id);
+                i += 1;
+            };
         }
     }
 

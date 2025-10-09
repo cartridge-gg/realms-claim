@@ -7,9 +7,9 @@ pub trait IERC20Token<T> {
     );
 }
 
-// Pistols Duel integration - currently disabled
-// See src/main.cairo for implementation notes
-// #[starknet::interface]
-// pub trait IPistolsDuel<T> {
-//     fn claim_starter_pack(ref self: T);
-// }
+#[starknet::interface]
+pub trait IERC721Token<T> {
+    fn transfer_from(
+        ref self: T, from: ContractAddress, to: ContractAddress, token_id: u256,
+    );
+}

@@ -2,6 +2,7 @@
 mod test_contract {
     use realms_claim::main::{IClaimDispatcher, IClaimDispatcherTrait};
     use realms_claim::mocks::simple_erc20::{ISimpleERC20Dispatcher, ISimpleERC20DispatcherTrait};
+    use realms_claim::mocks::simple_erc721::{ISimpleERC721Dispatcher, ISimpleERC721DispatcherTrait};
     use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address};
     use starknet::{ContractAddress, contract_address_const};
 
@@ -38,9 +39,20 @@ mod test_contract {
         ISimpleERC20Dispatcher { contract_address }
     }
 
+    fn deploy_mock_nft() -> ISimpleERC721Dispatcher {
+        let contract_class = declare("SimpleERC721").unwrap().contract_class();
+        let (contract_address, _) = contract_class.deploy(@array![]).unwrap();
+        ISimpleERC721Dispatcher { contract_address }
+    }
+
+    fn PISTOLS() -> ContractAddress {
+        contract_address_const::<'PISTOLS'>()
+    }
+
     fn deploy_claim_contract(
         lords_token: ContractAddress,
         loot_survivor_token: ContractAddress,
+        pistols_token: ContractAddress,
         treasury: ContractAddress,
     ) -> IClaimDispatcher {
         let contract_class = declare("ClaimContract").unwrap().contract_class();
@@ -48,7 +60,7 @@ mod test_contract {
             .deploy(
                 @array![
                     OWNER().into(), FORWARDER().into(), lords_token.into(),
-                    loot_survivor_token.into(), treasury.into(),
+                    loot_survivor_token.into(), pistols_token.into(), treasury.into(),
                 ],
             )
             .unwrap();
@@ -64,7 +76,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
         assert(claim_contract.contract_address != contract_address_const::<0>(), 'deploy failed');
     }
@@ -74,7 +86,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
         let balance = claim_contract.get_balance('test_key', RECIPIENT());
         assert(balance == 0, 'balance should be 0');
@@ -90,12 +102,13 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
 
         // Try to claim without forwarder role (should fail)
         start_cheat_caller_address(claim_contract.contract_address, RECIPIENT());
-        claim_contract.claim_from_forwarder(RECIPIENT());
+        let leaf_data = array![].span();
+        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
     }
 
     #[test]
@@ -103,7 +116,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
         let new_forwarder = contract_address_const::<'NEW_FORWARDER'>();
 
@@ -124,7 +137,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
 
         // OWNER (treasury) approves claim contract to spend tokens
@@ -138,9 +151,10 @@ mod test_contract {
         mock_ls.approve(claim_contract.contract_address, ls_amount);
         snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
-        // Execute claim as FORWARDER
+        // Execute claim as FORWARDER with empty leaf_data (no Pistols NFTs for simplicity)
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT());
+        let leaf_data = array![].span();
+        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
         snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
         // Verify recipient received tokens
@@ -171,7 +185,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
 
         // Treasury (OWNER) approves claim contract for multiple claims
@@ -193,11 +207,12 @@ mod test_contract {
         let lords_per_claim: u256 = 386 * 1000000000000000000;
         let ls_per_claim: u256 = 3;
 
-        // Execute claims as FORWARDER
+        // Execute claims as FORWARDER with empty leaf_data
+        let leaf_data = array![].span();
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(recipient1);
-        claim_contract.claim_from_forwarder(recipient2);
-        claim_contract.claim_from_forwarder(recipient3);
+        claim_contract.claim_from_forwarder(recipient1, leaf_data);
+        claim_contract.claim_from_forwarder(recipient2, leaf_data);
+        claim_contract.claim_from_forwarder(recipient3, leaf_data);
         snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
         // Verify all recipients got their tokens
@@ -230,7 +245,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
+            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
         );
 
         // Treasury only approves 100 LORDS (not enough for 386 LORDS claim)
@@ -243,6 +258,65 @@ mod test_contract {
 
         // Try to claim (should fail - insufficient allowance for LORDS)
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT()); // Should panic
+        let leaf_data = array![].span();
+        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data); // Should panic
+    }
+
+    // ========================================
+    // Pistols NFT Integration Tests
+    // ========================================
+
+    #[test]
+    fn test_claim_with_pistols_nfts() {
+        // Deploy mock tokens and NFT contract
+        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
+        let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
+        let mock_pistols = deploy_mock_nft();
+
+        let claim_contract = deploy_claim_contract(
+            mock_lords.contract_address,
+            mock_ls.contract_address,
+            mock_pistols.contract_address,
+            OWNER(),
+        );
+
+        // Pre-mint 3 Pistols NFTs to treasury (OWNER) with specific token IDs
+        start_cheat_caller_address(mock_pistols.contract_address, OWNER());
+        mock_pistols.mint(OWNER(), 101);
+        mock_pistols.mint(OWNER(), 102);
+        mock_pistols.mint(OWNER(), 103);
+
+        // Treasury approves claim contract for NFT transfers
+        mock_pistols.approve(claim_contract.contract_address, 101);
+        mock_pistols.approve(claim_contract.contract_address, 102);
+        mock_pistols.approve(claim_contract.contract_address, 103);
+        snforge_std::stop_cheat_caller_address(mock_pistols.contract_address);
+
+        // Treasury approves ERC20 tokens
+        start_cheat_caller_address(mock_lords.contract_address, OWNER());
+        let lords_amount: u256 = 1000 * 1000000000000000000;
+        mock_lords.approve(claim_contract.contract_address, lords_amount);
+        snforge_std::stop_cheat_caller_address(mock_lords.contract_address);
+
+        start_cheat_caller_address(mock_ls.contract_address, OWNER());
+        let ls_amount: u256 = 100;
+        mock_ls.approve(claim_contract.contract_address, ls_amount);
+        snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
+
+        // Execute claim with token IDs in leaf_data
+        let leaf_data = array![101, 102, 103].span();
+        start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
+        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
+
+        // Verify recipient received ERC20 tokens
+        let expected_lords: u256 = 386 * 1000000000000000000;
+        assert(mock_lords.balance_of(RECIPIENT()) == expected_lords, 'recipient no LORDS');
+        assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
+
+        // Verify recipient received all 3 Pistols NFTs
+        assert(mock_pistols.owner_of(101) == RECIPIENT(), 'recipient no NFT 101');
+        assert(mock_pistols.owner_of(102) == RECIPIENT(), 'recipient no NFT 102');
+        assert(mock_pistols.owner_of(103) == RECIPIENT(), 'recipient no NFT 103');
     }
 }
