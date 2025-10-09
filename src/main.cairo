@@ -15,18 +15,14 @@ mod ClaimContract {
     use openzeppelin_introspection::src5::SRC5Component;
     use openzeppelin_upgrades::UpgradeableComponent;
     use openzeppelin_upgrades::interface::IUpgradeable;
-    // Token addresses are now configurable via constructor, no longer using constants
-    // use realms_claim::constants::contracts::{
-    //     LOOT_SURVIVOR_ADDRESS, LORDS_TOKEN_ADDRESS, // PISTOLS_DUEL_ADDRESS,
-    // };
     use realms_claim::constants::interface::{
-        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, IERC721TokenDispatcher,
-        IERC721TokenDispatcherTrait,
+        IERC20TokenDispatcher, IERC20TokenDispatcherTrait, ITokenInterfaceDispatcher,
+        ITokenInterfaceDispatcherTrait,
     };
+    use realms_claim::constants::units::TEN_POW_18;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use realms_claim::types::leaf::LeafData;
     use super::*;
 
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -104,7 +100,7 @@ mod ClaimContract {
         ) {
             // MUST check caller is forwarder
             self.accesscontrol.assert_only_role(FORWARDER_ROLE);
-            // Transfer tokens and NFTs
+            // Transfer tokens and mint NFT pack
             self.mint_tokens(recipient, leaf_data);
         }
     }
@@ -116,35 +112,32 @@ mod ClaimContract {
             let treasury = self.treasury_address.read();
 
             // Transfer 386 LORDS tokens from treasury to recipient
-            let lords_amount: u256 = 386 * 1000000000000000000;
+            let lords_amount: u256 = 386 * TEN_POW_18;
             let lords_token = IERC20TokenDispatcher {
                 contract_address: self.lords_token_address.read(),
             };
             lords_token.transfer_from(treasury, recipient, lords_amount);
 
-            // Transfer 3 Loot Survivor tokens from treasury to recipient
+            // Transfer 3 Loot Survivor Dungeon tokens from treasury to recipient
             let loot_survivor = IERC20TokenDispatcher {
                 contract_address: self.loot_survivor_address.read(),
             };
-            loot_survivor.transfer_from(treasury, recipient, 3);
+            loot_survivor.transfer_from(treasury, recipient, 3 * TEN_POW_18);
 
-            // Transfer Pistols NFTs using pre-minted token IDs from leaf_data
-            // NFTs are pre-minted directly to this claim contract (no approval needed)
-            // leaf_data contains the token_ids array for this address
-            let pistols = IERC721TokenDispatcher { contract_address: self.pistols_address.read() };
-            let contract_address = starknet::get_contract_address();
-
-            let mut leaf_data = leaf_data;
-            let data = Serde::<LeafData>::deserialize(ref leaf_data).unwrap();
-
-            // Iterate through token_ids in leaf_data and transfer each NFT from contract to
-            // recipient
-            let mut i: u32 = 0;
-            while i < data.token_ids.len() {
-                let token_id: u256 = (*data.token_ids.at(i)).into();
-                pistols.transfer_from(contract_address, recipient, token_id);
-                i += 1;
+            // Call Pistols promo_airdrop with leaf hash as seed
+            // The seed ensures each recipient gets unique, deterministic randomness
+            // leaf_data[0] should contain the leaf hash from the forwarder
+            let seed: felt252 = if leaf_data.len() > 0 {
+                *leaf_data.at(0)
+            } else {
+                // Fallback: hash the recipient address if no leaf_data provided
+                core::poseidon::poseidon_hash_span(array![recipient.into()].span())
             };
+
+            let pistols = ITokenInterfaceDispatcher {
+                contract_address: self.pistols_address.read(),
+            };
+            pistols.promo_airdrop(recipient, seed);
         }
     }
 
