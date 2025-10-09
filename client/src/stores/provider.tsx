@@ -11,24 +11,23 @@ import ControllerConnector from "@cartridge/connector/controller";
 //   "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
 
 // Define session policies
-const policies = {
-  // contracts: {
-  //   [ETH_TOKEN_ADDRESS]: {
-  //     methods: [
-  //       {
-  //         name: "approve",
-  //         entrypoint: "approve",
-  //         description: "Approve spending of tokens",
-  //       },
-  //       { name: "transfer", entrypoint: "transfer" },
-  //     ],
-  //   },
-  // },
-};
+// const policies = {
+//   contracts: {
+//     [ETH_TOKEN_ADDRESS]: {
+//       methods: [
+//         {
+//           name: "approve",
+//           entrypoint: "approve",
+//           description: "Approve spending of tokens",
+//         },
+//         { name: "transfer", entrypoint: "transfer" },
+//       ],
+//     },
+//   },
+// };
 
 // Initialize the connector
 const connector = new ControllerConnector({
-  policies,
   // With the defaults, you can omit chains if you want to use:
   // - chains: [
   //     { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
