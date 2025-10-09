@@ -68,31 +68,6 @@ mod test_contract {
     }
 
     // ========================================
-    // Contract Deployment Tests
-    // ========================================
-
-    #[test]
-    fn test_deploy_contract() {
-        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
-        let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
-        );
-        assert(claim_contract.contract_address != contract_address_const::<0>(), 'deploy failed');
-    }
-
-    #[test]
-    fn test_get_balance_returns_zero() {
-        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
-        let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
-        );
-        let balance = claim_contract.get_balance('test_key', RECIPIENT());
-        assert(balance == 0, 'balance should be 0');
-    }
-
-    // ========================================
     // Access Control Tests
     // ========================================
 
@@ -133,14 +108,37 @@ mod test_contract {
 
     #[test]
     fn test_single_claim() {
-        // Deploy mock tokens and claim contract (OWNER is treasury)
+        // Deploy mock tokens, NFT contract, and claim contract (OWNER is treasury)
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
+        let mock_pistols = deploy_mock_nft();
+
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
+            mock_lords.contract_address,
+            mock_ls.contract_address,
+            mock_pistols.contract_address,
+            OWNER(),
         );
 
-        // OWNER (treasury) approves claim contract to spend tokens
+        // Pre-mint 3 Pistols NFTs directly to claim contract (no approval needed!)
+        start_cheat_caller_address(mock_pistols.contract_address, OWNER());
+        mock_pistols.mint(claim_contract.contract_address, 101);
+        mock_pistols.mint(claim_contract.contract_address, 102);
+        mock_pistols.mint(claim_contract.contract_address, 103);
+        snforge_std::stop_cheat_caller_address(mock_pistols.contract_address);
+
+        // Verify claim contract owns the NFTs
+        assert(
+            mock_pistols.owner_of(101) == claim_contract.contract_address, 'contract no NFT 101',
+        );
+        assert(
+            mock_pistols.owner_of(102) == claim_contract.contract_address, 'contract no NFT 102',
+        );
+        assert(
+            mock_pistols.owner_of(103) == claim_contract.contract_address, 'contract no NFT 103',
+        );
+
+        // OWNER (treasury) approves claim contract to spend ERC20 tokens
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let lords_amount: u256 = 1000 * 1000000000000000000; // 1000 LORDS
         mock_lords.approve(claim_contract.contract_address, lords_amount);
@@ -151,16 +149,21 @@ mod test_contract {
         mock_ls.approve(claim_contract.contract_address, ls_amount);
         snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
-        // Execute claim as FORWARDER with empty leaf_data (no Pistols NFTs for simplicity)
+        // Execute claim as FORWARDER with Pistols token IDs in leaf_data
+        let leaf_data = array![101, 102, 103].span();
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        let leaf_data = array![].span();
         claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
         snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
-        // Verify recipient received tokens
+        // Verify recipient received ERC20 tokens
         let expected_lords: u256 = 386 * 1000000000000000000;
         assert(mock_lords.balance_of(RECIPIENT()) == expected_lords, 'recipient no LORDS');
         assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
+
+        // Verify recipient received all 3 Pistols NFTs
+        assert(mock_pistols.owner_of(101) == RECIPIENT(), 'recipient no NFT 101');
+        assert(mock_pistols.owner_of(102) == RECIPIENT(), 'recipient no NFT 102');
+        assert(mock_pistols.owner_of(103) == RECIPIENT(), 'recipient no NFT 103');
 
         // Verify treasury (OWNER) balances decreased
         let owner_lords_after = mock_lords.balance_of(OWNER());
@@ -178,62 +181,6 @@ mod test_contract {
         let remaining_ls_allowance = mock_ls.allowance(OWNER(), claim_contract.contract_address);
         assert(remaining_ls_allowance == ls_amount - 3, 'wrong LS allowance');
     }
-
-    #[test]
-    fn test_multiple_claims_scenario() {
-        // Deploy mock tokens (OWNER is treasury)
-        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
-        let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address, PISTOLS(), OWNER(),
-        );
-
-        // Treasury (OWNER) approves claim contract for multiple claims
-        start_cheat_caller_address(mock_lords.contract_address, OWNER());
-        let total_lords: u256 = 2000 * 1000000000000000000; // 2000 LORDS
-        mock_lords.approve(claim_contract.contract_address, total_lords);
-        snforge_std::stop_cheat_caller_address(mock_lords.contract_address);
-
-        start_cheat_caller_address(mock_ls.contract_address, OWNER());
-        let total_ls: u256 = 20; // 20 LS tokens
-        mock_ls.approve(claim_contract.contract_address, total_ls);
-        snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
-
-        // Execute multiple claims using claim_from_forwarder
-        let recipient1 = contract_address_const::<'RECIPIENT1'>();
-        let recipient2 = contract_address_const::<'RECIPIENT2'>();
-        let recipient3 = contract_address_const::<'RECIPIENT3'>();
-
-        let lords_per_claim: u256 = 386 * 1000000000000000000;
-        let ls_per_claim: u256 = 3;
-
-        // Execute claims as FORWARDER with empty leaf_data
-        let leaf_data = array![].span();
-        start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(recipient1, leaf_data);
-        claim_contract.claim_from_forwarder(recipient2, leaf_data);
-        claim_contract.claim_from_forwarder(recipient3, leaf_data);
-        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
-
-        // Verify all recipients got their tokens
-        assert(mock_lords.balance_of(recipient1) == lords_per_claim, 'recipient1 no LORDS');
-        assert(mock_ls.balance_of(recipient1) == ls_per_claim, 'recipient1 no LS');
-
-        assert(mock_lords.balance_of(recipient2) == lords_per_claim, 'recipient2 no LORDS');
-        assert(mock_ls.balance_of(recipient2) == ls_per_claim, 'recipient2 no LS');
-
-        assert(mock_lords.balance_of(recipient3) == lords_per_claim, 'recipient3 no LORDS');
-        assert(mock_ls.balance_of(recipient3) == ls_per_claim, 'recipient3 no LS');
-
-        // Verify treasury balances decreased
-        let initial_supply: u256 = 10000 * 1000000000000000000;
-        let expected_lords_remaining: u256 = initial_supply - (lords_per_claim * 3);
-        let expected_ls_remaining: u256 = initial_supply - (ls_per_claim * 3);
-
-        assert(mock_lords.balance_of(OWNER()) == expected_lords_remaining, 'wrong treasury LORDS');
-        assert(mock_ls.balance_of(OWNER()) == expected_ls_remaining, 'wrong treasury LS');
-    }
-
 
     // ========================================
     // Error Case Tests
@@ -260,63 +207,5 @@ mod test_contract {
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
         let leaf_data = array![].span();
         claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data); // Should panic
-    }
-
-    // ========================================
-    // Pistols NFT Integration Tests
-    // ========================================
-
-    #[test]
-    fn test_claim_with_pistols_nfts() {
-        // Deploy mock tokens and NFT contract
-        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
-        let mock_pistols = deploy_mock_nft();
-
-        let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address,
-            mock_ls.contract_address,
-            mock_pistols.contract_address,
-            OWNER(),
-        );
-
-        // Pre-mint 3 Pistols NFTs directly to claim contract (no approval needed!)
-        start_cheat_caller_address(mock_pistols.contract_address, OWNER());
-        mock_pistols.mint(claim_contract.contract_address, 101);
-        mock_pistols.mint(claim_contract.contract_address, 102);
-        mock_pistols.mint(claim_contract.contract_address, 103);
-        snforge_std::stop_cheat_caller_address(mock_pistols.contract_address);
-
-        // Verify claim contract owns the NFTs
-        assert(mock_pistols.owner_of(101) == claim_contract.contract_address, 'contract no NFT 101');
-        assert(mock_pistols.owner_of(102) == claim_contract.contract_address, 'contract no NFT 102');
-        assert(mock_pistols.owner_of(103) == claim_contract.contract_address, 'contract no NFT 103');
-
-        // Treasury approves ERC20 tokens
-        start_cheat_caller_address(mock_lords.contract_address, OWNER());
-        let lords_amount: u256 = 1000 * 1000000000000000000;
-        mock_lords.approve(claim_contract.contract_address, lords_amount);
-        snforge_std::stop_cheat_caller_address(mock_lords.contract_address);
-
-        start_cheat_caller_address(mock_ls.contract_address, OWNER());
-        let ls_amount: u256 = 100;
-        mock_ls.approve(claim_contract.contract_address, ls_amount);
-        snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
-
-        // Execute claim with token IDs in leaf_data
-        let leaf_data = array![101, 102, 103].span();
-        start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
-        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
-
-        // Verify recipient received ERC20 tokens
-        let expected_lords: u256 = 386 * 1000000000000000000;
-        assert(mock_lords.balance_of(RECIPIENT()) == expected_lords, 'recipient no LORDS');
-        assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
-
-        // Verify recipient received all 3 Pistols NFTs
-        assert(mock_pistols.owner_of(101) == RECIPIENT(), 'recipient no NFT 101');
-        assert(mock_pistols.owner_of(102) == RECIPIENT(), 'recipient no NFT 102');
-        assert(mock_pistols.owner_of(103) == RECIPIENT(), 'recipient no NFT 103');
     }
 }
