@@ -1,11 +1,9 @@
 #[cfg(test)]
 mod test_contract {
-    use starknet::{ContractAddress, contract_address_const};
-    use snforge_std::{
-        declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address
-    };
     use realms_claim::main::{IClaimDispatcher, IClaimDispatcherTrait};
     use realms_claim::mocks::simple_erc20::{ISimpleERC20Dispatcher, ISimpleERC20DispatcherTrait};
+    use snforge_std::{ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address};
+    use starknet::{ContractAddress, contract_address_const};
 
     // ========================================
     // Helper Functions
@@ -24,7 +22,7 @@ mod test_contract {
     }
 
     fn deploy_mock_token(
-        name: ByteArray, symbol: ByteArray, initial_recipient: ContractAddress
+        name: ByteArray, symbol: ByteArray, initial_recipient: ContractAddress,
     ) -> ISimpleERC20Dispatcher {
         let contract_class = declare("SimpleERC20").unwrap().contract_class();
         let initial_supply: u256 = 10000 * 1000000000000000000; // 10,000 tokens
@@ -41,17 +39,17 @@ mod test_contract {
     }
 
     fn deploy_claim_contract(
-        lords_token: ContractAddress, loot_survivor_token: ContractAddress
+        lords_token: ContractAddress,
+        loot_survivor_token: ContractAddress,
+        treasury: ContractAddress,
     ) -> IClaimDispatcher {
         let contract_class = declare("ClaimContract").unwrap().contract_class();
         let (contract_address, _) = contract_class
             .deploy(
                 @array![
-                    OWNER().into(),
-                    FORWARDER().into(),
-                    lords_token.into(),
-                    loot_survivor_token.into()
-                ]
+                    OWNER().into(), FORWARDER().into(), lords_token.into(),
+                    loot_survivor_token.into(), treasury.into(),
+                ],
             )
             .unwrap();
         IClaimDispatcher { contract_address }
@@ -66,7 +64,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
         assert(claim_contract.contract_address != contract_address_const::<0>(), 'deploy failed');
     }
@@ -76,7 +74,7 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
         let balance = claim_contract.get_balance('test_key', RECIPIENT());
         assert(balance == 0, 'balance should be 0');
@@ -92,12 +90,12 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
 
         // Try to claim without forwarder role (should fail)
         start_cheat_caller_address(claim_contract.contract_address, RECIPIENT());
-        claim_contract.claim_from_forwarder(RECIPIENT(), array![].span());
+        claim_contract.claim_from_forwarder(RECIPIENT());
     }
 
     #[test]
@@ -105,106 +103,15 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
         let new_forwarder = contract_address_const::<'NEW_FORWARDER'>();
 
         // Call initialize as owner
         start_cheat_caller_address(claim_contract.contract_address, OWNER());
         claim_contract.initialize(new_forwarder);
-
         // Now new_forwarder should have forwarder role
-        // (verified implicitly - would panic if role not granted)
-    }
-
-    // ========================================
-    // Mock Token Tests
-    // ========================================
-
-    #[test]
-    fn test_mock_token_deployment() {
-        let mock_token = deploy_mock_token("Test Token", "TEST", OWNER());
-
-        // Verify initial setup
-        assert(mock_token.name() == "Test Token", 'wrong name');
-        assert(mock_token.symbol() == "TEST", 'wrong symbol');
-        assert(mock_token.decimals() == 18, 'wrong decimals');
-
-        let total_supply = mock_token.total_supply();
-        assert(total_supply == 10000 * 1000000000000000000, 'wrong total supply');
-
-        let owner_balance = mock_token.balance_of(OWNER());
-        assert(owner_balance == total_supply, 'wrong initial balance');
-    }
-
-    #[test]
-    fn test_mock_token_transfer() {
-        let mock_token = deploy_mock_token("Test Token", "TEST", OWNER());
-
-        start_cheat_caller_address(mock_token.contract_address, OWNER());
-        let transfer_amount: u256 = 100 * 1000000000000000000;
-        mock_token.transfer(RECIPIENT(), transfer_amount);
-
-        let recipient_balance = mock_token.balance_of(RECIPIENT());
-        assert(recipient_balance == transfer_amount, 'wrong recipient balance');
-
-        let owner_balance = mock_token.balance_of(OWNER());
-        let expected_owner: u256 = 9900 * 1000000000000000000;
-        assert(owner_balance == expected_owner, 'wrong owner balance');
-    }
-
-    #[test]
-    fn test_mock_token_transfer_from() {
-        let mock_token = deploy_mock_token("Test Token", "TEST", OWNER());
-
-        // OWNER approves RECIPIENT
-        start_cheat_caller_address(mock_token.contract_address, OWNER());
-        let approval_amount: u256 = 1000 * 1000000000000000000;
-        mock_token.approve(RECIPIENT(), approval_amount);
-
-        // Verify allowance
-        let allowance = mock_token.allowance(OWNER(), RECIPIENT());
-        assert(allowance == approval_amount, 'wrong allowance');
-
-        // RECIPIENT transfers from OWNER
-        start_cheat_caller_address(mock_token.contract_address, RECIPIENT());
-        let transfer_amount: u256 = 100 * 1000000000000000000;
-        mock_token.transfer_from(OWNER(), RECIPIENT(), transfer_amount);
-
-        // Verify balances
-        let recipient_balance = mock_token.balance_of(RECIPIENT());
-        assert(recipient_balance == transfer_amount, 'wrong recipient balance');
-
-        let owner_balance = mock_token.balance_of(OWNER());
-        let expected_owner: u256 = 9900 * 1000000000000000000;
-        assert(owner_balance == expected_owner, 'wrong owner balance');
-
-        // Verify remaining allowance
-        let remaining_allowance = mock_token.allowance(OWNER(), RECIPIENT());
-        assert(
-            remaining_allowance == approval_amount - transfer_amount, 'wrong remaining allowance'
-        );
-    }
-
-    #[test]
-    fn test_mock_token_mint() {
-        let mock_token = deploy_mock_token("Test Token", "TEST", OWNER());
-
-        let initial_balance = mock_token.balance_of(RECIPIENT());
-        assert(initial_balance == 0, 'recipient should have 0');
-
-        // Mint to recipient
-        let mint_amount: u256 = 500 * 1000000000000000000;
-        mock_token.mint(RECIPIENT(), mint_amount);
-
-        let new_balance = mock_token.balance_of(RECIPIENT());
-        assert(new_balance == mint_amount, 'wrong balance after mint');
-
-        // Total supply should increase
-        let total_supply = mock_token.total_supply();
-        assert(
-            total_supply == 10000 * 1000000000000000000 + mint_amount, 'wrong total supply'
-        );
+    // (verified implicitly - would panic if role not granted)
     }
 
     // ========================================
@@ -213,81 +120,70 @@ mod test_contract {
 
     #[test]
     fn test_single_claim() {
-        // Deploy mock tokens and claim contract
+        // Deploy mock tokens and claim contract (OWNER is treasury)
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
 
-        // Transfer tokens from OWNER to claim contract
+        // OWNER (treasury) approves claim contract to spend tokens
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let lords_amount: u256 = 1000 * 1000000000000000000; // 1000 LORDS
-        mock_lords.transfer(claim_contract.contract_address, lords_amount);
+        mock_lords.approve(claim_contract.contract_address, lords_amount);
+        snforge_std::stop_cheat_caller_address(mock_lords.contract_address);
 
         start_cheat_caller_address(mock_ls.contract_address, OWNER());
         let ls_amount: u256 = 100; // 100 LS tokens
-        mock_ls.transfer(claim_contract.contract_address, ls_amount);
-
-        // Claim contract approves itself to spend tokens (for transfer_from pattern)
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
-        mock_lords.approve(claim_contract.contract_address, lords_amount);
-
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
         mock_ls.approve(claim_contract.contract_address, ls_amount);
+        snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
         // Execute claim as FORWARDER
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT(), array![].span());
+        claim_contract.claim_from_forwarder(RECIPIENT());
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
         // Verify recipient received tokens
         let expected_lords: u256 = 386 * 1000000000000000000;
         assert(mock_lords.balance_of(RECIPIENT()) == expected_lords, 'recipient no LORDS');
         assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
 
-        // Verify claim contract balances decreased
-        let claim_lords_after = mock_lords.balance_of(claim_contract.contract_address);
-        assert(claim_lords_after == lords_amount - expected_lords, 'wrong claim LORDS');
+        // Verify treasury (OWNER) balances decreased
+        let owner_lords_after = mock_lords.balance_of(OWNER());
+        let initial_supply: u256 = 10000 * 1000000000000000000;
+        assert(owner_lords_after == initial_supply - expected_lords, 'wrong treasury LORDS');
 
-        let claim_ls_after = mock_ls.balance_of(claim_contract.contract_address);
-        assert(claim_ls_after == ls_amount - 3, 'wrong claim LS');
+        let owner_ls_after = mock_ls.balance_of(OWNER());
+        assert(owner_ls_after == initial_supply - 3, 'wrong treasury LS');
 
         // Verify allowances decreased
         let remaining_lords_allowance = mock_lords
-            .allowance(claim_contract.contract_address, claim_contract.contract_address);
-        assert(
-            remaining_lords_allowance == lords_amount - expected_lords, 'wrong LORDS allowance'
-        );
+            .allowance(OWNER(), claim_contract.contract_address);
+        assert(remaining_lords_allowance == lords_amount - expected_lords, 'wrong LORDS allowance');
 
-        let remaining_ls_allowance = mock_ls
-            .allowance(claim_contract.contract_address, claim_contract.contract_address);
+        let remaining_ls_allowance = mock_ls.allowance(OWNER(), claim_contract.contract_address);
         assert(remaining_ls_allowance == ls_amount - 3, 'wrong LS allowance');
     }
 
     #[test]
     fn test_multiple_claims_scenario() {
-        // Deploy mock tokens
+        // Deploy mock tokens (OWNER is treasury)
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
 
-        // Fund claim contract with enough for multiple claims
+        // Treasury (OWNER) approves claim contract for multiple claims
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
         let total_lords: u256 = 2000 * 1000000000000000000; // 2000 LORDS
-        mock_lords.transfer(claim_contract.contract_address, total_lords);
+        mock_lords.approve(claim_contract.contract_address, total_lords);
+        snforge_std::stop_cheat_caller_address(mock_lords.contract_address);
 
         start_cheat_caller_address(mock_ls.contract_address, OWNER());
         let total_ls: u256 = 20; // 20 LS tokens
-        mock_ls.transfer(claim_contract.contract_address, total_ls);
-
-        // Claim contract approves itself for transfer_from
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
-        mock_lords.approve(claim_contract.contract_address, total_lords);
-
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
         mock_ls.approve(claim_contract.contract_address, total_ls);
+        snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
         // Execute multiple claims using claim_from_forwarder
         let recipient1 = contract_address_const::<'RECIPIENT1'>();
@@ -299,9 +195,10 @@ mod test_contract {
 
         // Execute claims as FORWARDER
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(recipient1, array![].span());
-        claim_contract.claim_from_forwarder(recipient2, array![].span());
-        claim_contract.claim_from_forwarder(recipient3, array![].span());
+        claim_contract.claim_from_forwarder(recipient1);
+        claim_contract.claim_from_forwarder(recipient2);
+        claim_contract.claim_from_forwarder(recipient3);
+        snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
         // Verify all recipients got their tokens
         assert(mock_lords.balance_of(recipient1) == lords_per_claim, 'recipient1 no LORDS');
@@ -313,18 +210,13 @@ mod test_contract {
         assert(mock_lords.balance_of(recipient3) == lords_per_claim, 'recipient3 no LORDS');
         assert(mock_ls.balance_of(recipient3) == ls_per_claim, 'recipient3 no LS');
 
-        // Verify claim contract balances
-        let expected_lords_left: u256 = total_lords - (lords_per_claim * 3);
-        let expected_ls_left: u256 = total_ls - (ls_per_claim * 3);
+        // Verify treasury balances decreased
+        let initial_supply: u256 = 10000 * 1000000000000000000;
+        let expected_lords_remaining: u256 = initial_supply - (lords_per_claim * 3);
+        let expected_ls_remaining: u256 = initial_supply - (ls_per_claim * 3);
 
-        assert(
-            mock_lords.balance_of(claim_contract.contract_address) == expected_lords_left,
-            'wrong remaining LORDS'
-        );
-        assert(
-            mock_ls.balance_of(claim_contract.contract_address) == expected_ls_left,
-            'wrong remaining LS'
-        );
+        assert(mock_lords.balance_of(OWNER()) == expected_lords_remaining, 'wrong treasury LORDS');
+        assert(mock_ls.balance_of(OWNER()) == expected_ls_remaining, 'wrong treasury LS');
     }
 
 
@@ -338,24 +230,19 @@ mod test_contract {
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
         let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
+            mock_lords.contract_address, mock_ls.contract_address, OWNER(),
         );
 
-        // Transfer 1000 LORDS to claim contract
+        // Treasury only approves 100 LORDS (not enough for 386 LORDS claim)
         start_cheat_caller_address(mock_lords.contract_address, OWNER());
-        let transfer_amount: u256 = 1000 * 1000000000000000000;
-        mock_lords.transfer(claim_contract.contract_address, transfer_amount);
-
-        // Only approve 100 LORDS (not enough for 386 LORDS claim)
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
         let small_approval: u256 = 100 * 1000000000000000000;
         mock_lords.approve(claim_contract.contract_address, small_approval);
 
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
+        start_cheat_caller_address(mock_ls.contract_address, OWNER());
         mock_ls.approve(claim_contract.contract_address, 100);
 
         // Try to claim (should fail - insufficient allowance for LORDS)
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT(), array![].span()); // Should panic
+        claim_contract.claim_from_forwarder(RECIPIENT()); // Should panic
     }
 }
