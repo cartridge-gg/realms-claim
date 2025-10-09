@@ -8,6 +8,7 @@ pub mod tests {
     pub mod tests;
     pub mod test_mint_tokens;
     pub mod test_integration;
+    pub mod test_claim_with_mocks;
 }
 
 pub mod mocks {
