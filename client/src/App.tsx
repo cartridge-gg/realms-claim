@@ -22,7 +22,7 @@ function AppContent() {
 
   const handleMintStarterPack = () => {
     (connector as ControllerConnector).controller.openStarterPack(
-      "pirate-nation-claim-sepolia"
+      "pirate-nation-claim-mainnet"
     );
   };
 
