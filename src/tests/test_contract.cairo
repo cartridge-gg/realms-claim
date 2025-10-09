@@ -212,7 +212,7 @@ mod test_contract {
     // ========================================
 
     #[test]
-    fn test_complete_claim_flow_with_mocks() {
+    fn test_single_claim() {
         // Deploy mock tokens and claim contract
         let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
         let mock_ls = deploy_mock_token("Mock Loot Survivor", "mLS", OWNER());
@@ -236,17 +236,14 @@ mod test_contract {
         start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
         mock_ls.approve(claim_contract.contract_address, ls_amount);
 
-        // Now we can actually test the claim_from_forwarder function!
+        // Execute claim as FORWARDER
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
         claim_contract.claim_from_forwarder(RECIPIENT(), array![].span());
 
         // Verify recipient received tokens
-        let recipient_lords = mock_lords.balance_of(RECIPIENT());
         let expected_lords: u256 = 386 * 1000000000000000000;
-        assert(recipient_lords == expected_lords, 'recipient no LORDS');
-
-        let recipient_ls = mock_ls.balance_of(RECIPIENT());
-        assert(recipient_ls == 3, 'recipient no LS');
+        assert(mock_lords.balance_of(RECIPIENT()) == expected_lords, 'recipient no LORDS');
+        assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
 
         // Verify claim contract balances decreased
         let claim_lords_after = mock_lords.balance_of(claim_contract.contract_address);
@@ -254,6 +251,17 @@ mod test_contract {
 
         let claim_ls_after = mock_ls.balance_of(claim_contract.contract_address);
         assert(claim_ls_after == ls_amount - 3, 'wrong claim LS');
+
+        // Verify allowances decreased
+        let remaining_lords_allowance = mock_lords
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
+        assert(
+            remaining_lords_allowance == lords_amount - expected_lords, 'wrong LORDS allowance'
+        );
+
+        let remaining_ls_allowance = mock_ls
+            .allowance(claim_contract.contract_address, claim_contract.contract_address);
+        assert(remaining_ls_allowance == ls_amount - 3, 'wrong LS allowance');
     }
 
     #[test]
@@ -319,44 +327,6 @@ mod test_contract {
         );
     }
 
-    #[test]
-    fn test_claim_with_transfer_from() {
-        // Test using transfer_from pattern (how the real contract works)
-        let mock_lords = deploy_mock_token("Mock LORDS", "mLORDS", OWNER());
-        let mock_ls = deploy_mock_token("Mock LS", "mLS", OWNER());
-        let claim_contract = deploy_claim_contract(
-            mock_lords.contract_address, mock_ls.contract_address
-        );
-
-        // Transfer tokens to claim contract
-        start_cheat_caller_address(mock_lords.contract_address, OWNER());
-        let amount: u256 = 1000 * 1000000000000000000;
-        mock_lords.transfer(claim_contract.contract_address, amount);
-
-        start_cheat_caller_address(mock_ls.contract_address, OWNER());
-        mock_ls.transfer(claim_contract.contract_address, 100);
-
-        // Claim contract approves itself to spend its own tokens
-        start_cheat_caller_address(mock_lords.contract_address, claim_contract.contract_address);
-        mock_lords.approve(claim_contract.contract_address, amount);
-
-        start_cheat_caller_address(mock_ls.contract_address, claim_contract.contract_address);
-        mock_ls.approve(claim_contract.contract_address, 100);
-
-        // Execute claim as FORWARDER - this will call transfer_from internally
-        start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT(), array![].span());
-
-        // Verify recipient got tokens
-        let claim_amount: u256 = 386 * 1000000000000000000;
-        assert(mock_lords.balance_of(RECIPIENT()) == claim_amount, 'recipient no tokens');
-        assert(mock_ls.balance_of(RECIPIENT()) == 3, 'recipient no LS');
-
-        // Verify allowance decreased
-        let remaining_allowance = mock_lords
-            .allowance(claim_contract.contract_address, claim_contract.contract_address);
-        assert(remaining_allowance == amount - claim_amount, 'wrong remaining allowance');
-    }
 
     // ========================================
     // Error Case Tests
