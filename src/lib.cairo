@@ -1,12 +1,14 @@
 // Constants
 pub mod constants {
-    pub mod contracts;
     pub mod interface;
 }
 
 pub mod tests {
-    pub mod tests;
     pub mod test_contract;
+}
+
+pub mod types {
+    pub mod leaf;
 }
 
 pub mod mocks {

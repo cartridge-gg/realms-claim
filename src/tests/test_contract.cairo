@@ -159,9 +159,15 @@ mod test_contract {
         snforge_std::stop_cheat_caller_address(mock_ls.contract_address);
 
         // Execute claim as FORWARDER with Pistols token IDs in leaf_data
-        let leaf_data = array![101, 102, 103].span();
+        // Create and serialize LeafData struct
+        use realms_claim::types::leaf::LeafData;
+        let token_ids = array![101, 102, 103].span();
+        let leaf_data_struct = LeafData { token_ids };
+        let mut serialized = array![];
+        Serde::serialize(@leaf_data_struct, ref serialized);
+
         start_cheat_caller_address(claim_contract.contract_address, FORWARDER());
-        claim_contract.claim_from_forwarder(RECIPIENT(), leaf_data);
+        claim_contract.claim_from_forwarder(RECIPIENT(), serialized.span());
         snforge_std::stop_cheat_caller_address(claim_contract.contract_address);
 
         // Verify recipient received ERC20 tokens

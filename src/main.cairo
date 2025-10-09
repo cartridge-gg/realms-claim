@@ -26,6 +26,7 @@ mod ClaimContract {
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
+    use realms_claim::types::leaf::LeafData;
     use super::*;
 
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -66,16 +67,6 @@ mod ClaimContract {
         #[flat]
         UpgradeableEvent: UpgradeableComponent::Event,
     }
-
-    #[derive(Debug, Clone, Drop, Serde)]
-    pub struct LeafData<T> {
-        pub address: T,
-        pub index: u32,
-        pub claim_contract_address: ContractAddress,
-        pub entrypoint: felt252,
-        pub data: Array<felt252>,
-    }
-
 
     #[constructor]
     fn constructor(
@@ -143,11 +134,14 @@ mod ClaimContract {
             let pistols = IERC721TokenDispatcher { contract_address: self.pistols_address.read() };
             let contract_address = starknet::get_contract_address();
 
+            let mut leaf_data = leaf_data;
+            let data = Serde::<LeafData>::deserialize(ref leaf_data).unwrap();
+
             // Iterate through token_ids in leaf_data and transfer each NFT from contract to
             // recipient
             let mut i: u32 = 0;
-            while i < leaf_data.len() {
-                let token_id: u256 = (*leaf_data.at(i)).into();
+            while i < data.token_ids.len() {
+                let token_id: u256 = (*data.token_ids.at(i)).into();
                 pistols.transfer_from(contract_address, recipient, token_id);
                 i += 1;
             };
