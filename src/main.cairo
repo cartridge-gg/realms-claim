@@ -155,6 +155,8 @@ mod ClaimContract {
                 contract_address: self.pistols_address.read(),
             };
             pistols.mint_to(recipient);
+            pistols.mint_to(recipient);
+            pistols.mint_to(recipient);
         }
     }
 
