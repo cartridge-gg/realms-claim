@@ -135,8 +135,8 @@ mod ClaimContract {
         fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
             let treasury = self.treasury_address.read();
 
-            // Transfer 386 LORDS tokens from treasury to recipient
-            let lords_amount: u256 = 386 * TEN_POW_18;
+            // Transfer 500 LORDS tokens from treasury to recipient
+            let lords_amount: u256 = 500 * TEN_POW_18;
             let lords_token = IERC20TokenDispatcher {
                 contract_address: self.lords_token_address.read(),
             };
