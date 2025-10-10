@@ -5,12 +5,16 @@ const FORWARDER_ROLE: felt252 = selector!("FORWARDER_ROLE");
 #[starknet::interface]
 pub trait IClaim<T> {
     fn initialize(ref self: T, forwarder_address: ContractAddress);
-    fn get_balance(self: @T, key: felt252, address: ContractAddress) -> u32;
     fn claim_from_forwarder(ref self: T, recipient: ContractAddress, leaf_data: Span<felt252>);
     fn update_lords_token_address(ref self: T, new_address: ContractAddress);
     fn update_loot_survivor_address(ref self: T, new_address: ContractAddress);
     fn update_pistols_address(ref self: T, new_address: ContractAddress);
     fn update_treasury_address(ref self: T, new_address: ContractAddress);
+
+    fn loot_survivor_address(self: @T) -> ContractAddress;
+    fn pistols_address(self: @T) -> ContractAddress;
+    fn lords_token_address(self: @T) -> ContractAddress;
+    fn treasury_address(self: @T) -> ContractAddress;
 }
 
 #[starknet::contract]
@@ -24,9 +28,7 @@ mod ClaimContract {
         ITokenInterfaceDispatcherTrait,
     };
     use realms_claim::constants::units::TEN_POW_18;
-    use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-    };
+    use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess};
     use super::*;
 
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -95,10 +97,6 @@ mod ClaimContract {
             self.accesscontrol._grant_role(FORWARDER_ROLE, forwarder_address);
         }
 
-        fn get_balance(self: @ContractState, key: felt252, address: ContractAddress) -> u32 {
-            self.balance.entry((key, address)).read()
-        }
-
         fn claim_from_forwarder(
             ref self: ContractState, recipient: ContractAddress, leaf_data: Span<felt252>,
         ) {
@@ -126,6 +124,22 @@ mod ClaimContract {
         fn update_treasury_address(ref self: ContractState, new_address: ContractAddress) {
             self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
             self.treasury_address.write(new_address);
+        }
+
+        fn loot_survivor_address(self: @ContractState) -> ContractAddress {
+            self.loot_survivor_address.read()
+        }
+
+        fn pistols_address(self: @ContractState) -> ContractAddress {
+            self.pistols_address.read()
+        }
+
+        fn lords_token_address(self: @ContractState) -> ContractAddress {
+            self.lords_token_address.read()
+        }
+
+        fn treasury_address(self: @ContractState) -> ContractAddress {
+            self.treasury_address.read()
         }
     }
 

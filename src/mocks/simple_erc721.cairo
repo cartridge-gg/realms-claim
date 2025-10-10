@@ -40,7 +40,9 @@ mod SimpleERC721 {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, name: ByteArray, symbol: ByteArray, base_uri: ByteArray) {
+    fn constructor(
+        ref self: ContractState, name: ByteArray, symbol: ByteArray, base_uri: ByteArray,
+    ) {
         self.erc721.initializer(name, symbol, base_uri);
         self.next_token_id.write(1);
     }
