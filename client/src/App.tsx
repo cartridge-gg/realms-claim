@@ -1,7 +1,6 @@
 import "./App.css";
 import { StarknetProvider } from "./stores/provider";
-import { useAccount, useConnect, useDisconnect } from "@starknet-react/core";
-import { StarterPackItemType } from "@cartridge/controller";
+import { useAccount, useConnect } from "@starknet-react/core";
 import type ControllerConnector from "@cartridge/connector/controller";
 import { useEffect } from "react";
 import pirateSvg from "./assets/pirate.svg";
