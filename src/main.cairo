@@ -149,22 +149,22 @@ mod ClaimContract {
         fn mint_tokens(self: @ContractState, recipient: ContractAddress) {
             let treasury = self.treasury_address.read();
 
-            // Transfer 500 LORDS tokens from treasury to recipient
-            let lords_amount: u256 = 500 * TEN_POW_18;
+            // Transfer 250 LORDS tokens from treasury to recipient
+            let lords_amount: u256 = 250 * TEN_POW_18;
             let lords_token = IERC20TokenDispatcher {
                 contract_address: self.lords_token_address.read(),
             };
             lords_token.transfer_from(treasury, recipient, lords_amount);
 
-            // Transfer 3 Loot Survivor Dungeon tokens from treasury to recipient
+            // Transfer 2 Loot Survivor Dungeon tokens from treasury to recipient
             let loot_survivor = IERC20TokenDispatcher {
                 contract_address: self.loot_survivor_address.read(),
             };
-            loot_survivor.transfer_from(treasury, recipient, 3 * TEN_POW_18);
+            loot_survivor.transfer_from(treasury, recipient, 2 * TEN_POW_18);
 
             // Call Pistols mint_to function
             // The Pistols team will handle randomness and minting logic internally
-            // Mints 1 pack (5 Duelists) to the recipient
+            // Mints 3 pack (5 Duelists per pack) to the recipient
             let pistols = ITokenInterfaceDispatcher {
                 contract_address: self.pistols_address.read(),
             };
