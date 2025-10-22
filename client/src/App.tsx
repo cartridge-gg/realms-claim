@@ -52,7 +52,7 @@ function AppContent() {
             </span>
             <span className="font-fell-sc italic tracking-wider">your</span>
             <span className="font-fell uppercase tracking-[0.15rem]">
-              free game
+              free assets
             </span>
           </div>
         </button>
