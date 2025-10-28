@@ -8,7 +8,7 @@ import crossSvg from "./assets/cross.svg";
 import realmsSvg from "./assets/realms.svg";
 
 function AppContent() {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { connectors, connector, connectAsync } = useConnect();
 
   const handleButtonClick = () => {
@@ -17,6 +17,10 @@ function AppContent() {
     } else {
       connectAsync({ connector: connectors[0] });
     }
+  };
+
+  const handleViewInventory = () => {
+    (connector as ControllerConnector).controller.openProfile("inventory");
   };
 
   const handleMintStarterPack = () => {
@@ -42,20 +46,34 @@ function AppContent() {
         <img src={realmsSvg} alt="Realms" className="w-12 h-12" />
       </div>
       <div className=" fixed top-1/2 left-1/2 -translate-x-1/2">
-        <button
-          onClick={handleButtonClick}
-          className="px-8 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
-        >
-          <div className="flex flex-row gap-2">
-            <span className="font-fell uppercase tracking-[0.15rem]">
-              Claim
-            </span>
-            <span className="font-fell-sc italic tracking-wider">your</span>
-            <span className="font-fell uppercase tracking-[0.15rem]">
-              free assets
-            </span>
-          </div>
-        </button>
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={handleButtonClick}
+            className="px-8 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
+          >
+            <div className="flex flex-row gap-2">
+              <span className="font-fell uppercase tracking-[0.15rem]">
+                Claim
+              </span>
+              <span className="font-fell-sc italic tracking-wider">your</span>
+              <span className="font-fell uppercase tracking-[0.15rem]">
+                free assets
+              </span>
+            </div>
+          </button>
+          {isConnected ? (
+            <button
+              onClick={handleViewInventory}
+              className="px-8 hover:cursor-pointer py-4 backdrop-blur-md border-[3px] border-[#FFFFFF50] rounded-xl text-white"
+            >
+              <div className="flex flex-row gap-2 justify-center">
+                <span className="font-fell uppercase tracking-[0.15rem]">
+                  View Inventory
+                </span>
+              </div>
+            </button>
+          ) : null}
+        </div>
       </div>
       <div>
         {/* {address ? (
