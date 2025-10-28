@@ -9,7 +9,7 @@ import ControllerConnector from "@cartridge/connector/controller";
 // Initialize the connector
 const connector = new ControllerConnector({
   preset: "eternum",
-  slot: "arcade-main",
+  slot: "claim-main",
 });
 // Configure RPC provider
 const provider = jsonRpcProvider({
