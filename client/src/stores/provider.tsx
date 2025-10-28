@@ -33,8 +33,9 @@ const connector = new ControllerConnector({
   //     { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
   //     { rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet" },
   //   ]
+  preset: "eternum",
+  slot: "https://api.cartridge.gg/x/arcade-main/torii",
 });
-
 // Configure RPC provider
 const provider = jsonRpcProvider({
   rpc: (chain: Chain) => {
